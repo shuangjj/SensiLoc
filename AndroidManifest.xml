@@ -35,11 +35,6 @@
             android:exported="true" >
         </service>
 
-<!--         <receiver
-            android:name="edu.temple.cis8590.sensiloc.LocationUpdateReceiver"
-            android:enabled="true"
-            android:exported="true" >
-        </receiver> -->
     </application>
 
 </manifest>

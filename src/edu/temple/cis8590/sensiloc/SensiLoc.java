@@ -1,15 +1,22 @@
 package edu.temple.cis8590.sensiloc;
 
 
+import java.util.Timer;
+import java.util.TimerTask;
+
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Looper;
+import android.os.Message;
 import android.provider.Settings;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Service;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
@@ -20,6 +27,8 @@ import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.os.BatteryManager;
+import android.os.Handler;
 
 public class SensiLoc extends Activity {
     public static final String LOG_TAG = "SensiLoc";
@@ -27,20 +36,29 @@ public class SensiLoc extends Activity {
     public static final String KEY_FREQ = "sensiloc.freq";
   
     
-    private Intent sensiServiceIntent = null;
-    private Intent locateServiceIntent=null;
+   
     // Layout views 
     EditText et_time;
     EditText et_freq;
+    TextView tv_result;
     Spinner method_spinner;
+    
+    String method;
+    long exper_time = 0;
     
     boolean enNetworkRequired;
     boolean enGPSRequired;
-    
-    String method;
-    
+    // Service intents and status
+    private Intent sensiServiceIntent = null;
+    private Intent locateServiceIntent=null;
     boolean sensiServiceStarted = false;
     boolean locateServiceStarted = false;
+    // Timer for experiment time
+    Timer main_timer = null;
+    // Battery
+    int startLevel = 0;
+    int endLevel = 0;
+    Handler mainHandler = null;
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -58,7 +76,7 @@ public class SensiLoc extends Activity {
         // Time & Frequency
         et_time = (EditText)findViewById(R.id.editText_time);
         et_freq = (EditText)findViewById(R.id.editText_freq);
-        
+        tv_result = (TextView)findViewById(R.id.textView_result);
         // Start button
         Button but_start = (Button)findViewById(R.id.button_start);
         but_start.setOnClickListener(new OnClickListener() {
@@ -68,9 +86,11 @@ public class SensiLoc extends Activity {
 				int freq = 0;
 				if((et_freq != null) && !et_freq.getText().toString().trim().equals("")) {
 					Log.d(SensiLoc.LOG_TAG, "Freq: "+et_freq.getText().toString().trim()+".");
-					freq = new Integer(et_freq.getText().toString());
+					freq = Integer.valueOf(et_freq.getText().toString().trim()).intValue();
 				}
-				
+				if( (et_time !=null) && !et_time.getText().toString().trim().equals("")) {
+					exper_time = Integer.valueOf(et_time.getText().toString().trim()).longValue();
+				}
 				method = method_spinner.getSelectedItem().toString();
 				Log.d(SensiLoc.LOG_TAG, "Put (freq, "+freq+") (method, "+method+") to Intent");
 				
@@ -125,15 +145,57 @@ public class SensiLoc extends Activity {
 					AlertDialog alert = builder.create();
 					alert.show();
 					
-				}else {
+				}else { // !(enNetworkRequired || enGPSRequired)
 					
+					// Get start battery level
+					IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+					Intent battery = getApplicationContext().registerReceiver(null, ifilter);
+					startLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+					Log.d(LOG_TAG, "Battery level at start " + startLevel);
+					// Start services
 					startService(locateServiceIntent);
 					locateServiceStarted = true;
-			        // Start orientation service
+			        
 			        if((method != null) && method.equals("Adaptive")) {
 			        	startService(sensiServiceIntent);
 			        	sensiServiceStarted = true;
 			        }
+			        
+			        // Start timer
+			        main_timer = new Timer();
+			        main_timer.schedule(new TimerTask() {
+
+						@Override
+						public void run() {
+							Looper.prepare();
+							// Get end battery level
+							IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+							Intent battery = getApplicationContext().registerReceiver(null, ifilter);
+							endLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+							Log.d(LOG_TAG, "Battery level at end " + endLevel);
+							//  Stop all running services
+							if(locateServiceStarted) {
+					    		stopService(locateServiceIntent);	
+					    		locateServiceStarted = false;
+					    	}
+						  	if(sensiServiceStarted) {
+						  		stopService(sensiServiceIntent);
+						  		sensiServiceStarted = false;
+						  	}
+						  	if(mainHandler != null) {
+						  		mainHandler.sendEmptyMessage(0);
+						  	}
+						  	//tv_result.setText("Test is over, used battery level " + (endLevel-startLevel));
+							Toast.makeText(getApplicationContext(), "Time out, used battery level "
+									+ (endLevel-startLevel), Toast.LENGTH_LONG).show();
+
+							Looper.loop();
+							
+						}
+			        	
+			        }, exper_time*60*1000);
+			        
+			        tv_result.setText("Running...");
 				}				
 				
 			}
@@ -145,6 +207,7 @@ public class SensiLoc extends Activity {
 
 			@Override
 			public void onClick(View v) {
+				main_timer.cancel();
 			  	if(locateServiceStarted) {
 		    		stopService(locateServiceIntent);	
 		    		locateServiceStarted = false;
@@ -153,12 +216,27 @@ public class SensiLoc extends Activity {
 			  		stopService(sensiServiceIntent);
 			  		sensiServiceStarted = false;
 			  	}
+			  	tv_result.setText("Stopped");
 			  	Toast.makeText(v.getContext(), "Services stopped", Toast.LENGTH_SHORT).show();
 			}
         	
         });
         
+        mainHandler = new Handler() {
+        	@Override
+        	public void handleMessage(Message msg) {
+        		switch(msg.what) {
+        		case 0:
+        			tv_result.setText("Test over, battery level used " + (startLevel - endLevel));
+        			break;
+        		default:
+        			;
+        		}
+        	}
+        	
+        };
     }
+    
     @Override
     public void onResume() 
     {
@@ -171,18 +249,69 @@ public class SensiLoc extends Activity {
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
     	if(requestCode==100) {
     		if(resultCode==0) {
-    			// TODO: check setting results
-    			if(enGPSRequired)
-    				;
-    			String providers = Settings.Secure.getString(getContentResolver(), Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
-    			Log.i(LOG_TAG, "providers allowed by user "+providers);		
-    			Toast.makeText(this, "start GPS", Toast.LENGTH_SHORT).show();
+    			// Check setting results
+    			LocationManager lm = (LocationManager) this.getSystemService(Service.LOCATION_SERVICE);
+    			boolean isNetwork = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+				boolean isGPS = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+    			if(enGPSRequired && !isGPS) {
+    				Toast.makeText(this, "GPS required!!", Toast.LENGTH_LONG).show();
+    				return;
+    			}
+    			if(enNetworkRequired && !isNetwork) {
+    				Toast.makeText(this, "Netwrok required!!", Toast.LENGTH_LONG).show();
+    				return;
+    			}
+    			
+    			Toast.makeText(this, "Start services", Toast.LENGTH_SHORT).show();
+    			
+    			// Get start battery level
+				IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+				Intent battery = getApplicationContext().registerReceiver(null, ifilter);
+				startLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+				Log.d(LOG_TAG, "Battery level at start " + startLevel);
+				
+				// Start services 
 				startService(locateServiceIntent);
 				locateServiceStarted = true;
 				if((method != null) && method.equals("Adaptive")) {
 					startService(sensiServiceIntent);
-					sensiServiceStarted = false;
+					sensiServiceStarted = true;
 				}
+				
+				// Start timer
+		        main_timer = new Timer();
+		        main_timer.schedule(new TimerTask() {
+					@Override
+					public void run() {
+						Looper.prepare();
+						// Get end battery level
+						IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+						Intent battery = getApplicationContext().registerReceiver(null, ifilter);
+						endLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+						
+						Log.d(LOG_TAG, "Battery level at end " + endLevel);
+						//  Stop all running services
+						if(locateServiceStarted) {
+				    		stopService(locateServiceIntent);	
+				    		locateServiceStarted = false;
+				    	}
+					  	if(sensiServiceStarted) {
+					  		stopService(sensiServiceIntent);
+					  		sensiServiceStarted = false;
+					  	}
+					  	if(mainHandler != null) {
+					  		mainHandler.sendEmptyMessage(0);
+					  	}
+					  	//tv_result.setText("Test is over, used battery level " + (endLevel-startLevel));
+						Toast.makeText(getApplicationContext(), "Time out, used battery level "
+								+ (endLevel-startLevel), Toast.LENGTH_LONG).show();
+						
+						Looper.loop();
+						
+					}
+		        	
+		        }, exper_time*60*1000);
+		        tv_result.setText("Running...");
     		} else {
     			Toast.makeText(this, "start GPS failed, returned " + resultCode, Toast.LENGTH_SHORT).show();
     		}
