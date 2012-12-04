@@ -12,8 +12,21 @@ Following is the information about the development environments:
  * Android SDK
  
 
-Program Structure
+Application Structure
 --------------------
+There are 3 main componets in this application:
+ * Main Activity - SensiLoc
+ * Sensor Service - SensiService
+ * Locate Service - LocateService
+
+The functions of each componets are as follows:
+ 1. SensiLoc
+ Get user inputs including the *experiment time*, *frequency of location request* and the *method to locate*. After start button clicked, the availability of GPS and Network will be checked according to the method selected. Location Service will be started after the check. In addition to Locate Service, Sensor Service will be also started if adaptive method selected.
+ 2. Sensor Service
+ In the onCreate() callback, the handlers of sensors (accelerometer and magnetic field) can be gotten from the Sensor Manager and listeners will be registered for the updates from respect sensors. So in the onSensorChanged() callback of the SensorListener, the update value of acceleration and magnetic field force can be extracted from the SensorEvent. Use both acceleration and magnetic field values we can get the rotation matrix. After get the rotation matrix, we remap the device coordinate system to the world coordinate system. Then we get the orientation of the mobile. Here we need the azimuth value of the orientation to detect the moving status of the device.
+ 3. Locate Service
+ After extracting the parameters in the Intent from the main Activity, 
+ 
 
 Acknowlegement
 --------------------
