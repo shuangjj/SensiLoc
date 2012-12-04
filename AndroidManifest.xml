@@ -28,9 +28,9 @@
             </intent-filter>
         </activity>
 
-        <service android:name="edu.temple.cis8590.sensiloc.SensiService" />
+        <service android:name="edu.temple.cis8590.sensiloc.services.SensiService" />
         <service
-            android:name="edu.temple.cis8590.sensiloc.LocateService"
+            android:name="edu.temple.cis8590.sensiloc.services.LocateService"
             android:enabled="true"
             android:exported="true" >
         </service>

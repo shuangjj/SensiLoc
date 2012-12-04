@@ -1,4 +1,4 @@
-package edu.temple.cis8590.sensiloc;
+package edu.temple.cis8590.sensiloc.services;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -25,6 +25,7 @@ import android.provider.Settings;
 import android.util.Log;
 import android.widget.Toast;
 
+import edu.temple.cis8590.sensiloc.*;
 public class LocateService extends Service {
 	private static final String LOG_TAG = "LocateService";
 	// User setup from SensiLoc Activity

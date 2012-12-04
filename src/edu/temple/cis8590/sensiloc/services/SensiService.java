@@ -1,4 +1,4 @@
-package edu.temple.cis8590.sensiloc;
+package edu.temple.cis8590.sensiloc.services;
 
 import java.util.List;
 
@@ -13,6 +13,7 @@ import android.os.IBinder;
 import android.util.Log;
 import android.widget.Toast;
 
+import edu.temple.cis8590.sensiloc.*;
 public class SensiService extends Service implements SensorEventListener{
 	private SensorManager sm;
     private Sensor mAcceler;
@@ -22,6 +23,7 @@ public class SensiService extends Service implements SensorEventListener{
     private float[] mLastMagneticValue = new float[3];
     private boolean mLastAccelerSet = false;
     private boolean mLastMagneticSet = false;
+    
     private float[] mRotationMatrix = new float[9];
     private float[] mTempMatrix = new float[9];
     private float[] mOrientation = new float[3];
@@ -79,12 +81,20 @@ public class SensiService extends Service implements SensorEventListener{
 		} else if(event.sensor == mMagnetic) {
 			System.arraycopy(event.values, 0, mLastMagneticValue, 0, event.values.length);
 			mLastMagneticSet = true;
+			Log.d(SensiLoc.LOG_TAG, String.format("Geomagnetic Field Sensor: %f", mLastMagneticValue[1]));
 		}
 		if(mLastAccelerSet && mLastMagneticSet) {
-			SensorManager.getRotationMatrix(mRotationMatrix, null, mLastAccelerValue, mLastMagneticValue);
-			//SensorManager.getRotationMatrix(mTempMatrix, null, mLastAccelerValue, mLastMagneticValue);
-			//SensorManager.remapCoordinateSystem(mTempMatrix, SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X, mRotationMatrix);
+			boolean ret = SensorManager.getRotationMatrix(mRotationMatrix, null, mLastAccelerValue, mLastMagneticValue);
+			if(!ret) {
+				Log.e(SensiLoc.LOG_TAG, "getRotationMatrix failed");
+				return;
+			}
+			SensorManager.getRotationMatrix(mTempMatrix, null, mLastAccelerValue, mLastMagneticValue);
+			// Remap coordinate system so that y-axis of device coordinate system aligns with the 
+			// z-axis of the orientation world coordinate system
+			SensorManager.remapCoordinateSystem(mTempMatrix, SensorManager.AXIS_X, SensorManager.AXIS_Z, mRotationMatrix);
 			SensorManager.getOrientation(mRotationMatrix, mOrientation);
+			
 			int azimuth = Math.round(mOrientation[0]*rad2deg);
 			if(azimuth<0) {
 				azimuth = 360+azimuth;

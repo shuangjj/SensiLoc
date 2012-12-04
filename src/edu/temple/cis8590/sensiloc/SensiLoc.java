@@ -2,6 +2,7 @@ package edu.temple.cis8590.sensiloc;
 
 
 import java.util.Timer;
+
 import java.util.TimerTask;
 
 import android.location.LocationManager;
@@ -30,6 +31,7 @@ import android.widget.Toast;
 import android.os.BatteryManager;
 import android.os.Handler;
 
+import edu.temple.cis8590.sensiloc.services.*;
 public class SensiLoc extends Activity {
     public static final String LOG_TAG = "SensiLoc";
     public static final String KEY_METHOD = "sensiloc.methods";
@@ -123,10 +125,10 @@ public class SensiLoc extends Activity {
 							@Override
 							public void onClick(DialogInterface dialog, int which) {
 								// Redirect user to setup window
-								 final ComponentName toLaunch = new ComponentName("com.android.settings","com.android.settings.SecuritySettings");
+								 //final ComponentName toLaunch = new ComponentName("com.android.settings","com.android.settings.SecuritySettings");
 								 final Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-								 intent.addCategory(Intent.CATEGORY_LAUNCHER);
-								 intent.setComponent(toLaunch);
+								 //intent.addCategory(Intent.CATEGORY_LAUNCHER);
+								 //intent.setComponent(toLaunch);
 								 //intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 								 startActivityForResult(intent, 100);
 								 dialog.cancel();
@@ -150,8 +152,9 @@ public class SensiLoc extends Activity {
 					// Get start battery level
 					IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
 					Intent battery = getApplicationContext().registerReceiver(null, ifilter);
-					startLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-					Log.d(LOG_TAG, "Battery level at start " + startLevel);
+					int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+					
+					Log.d(LOG_TAG, String.format("Battery level at start %d: %d", startLevel, scale));
 					// Start services
 					startService(locateServiceIntent);
 					locateServiceStarted = true;
@@ -171,8 +174,9 @@ public class SensiLoc extends Activity {
 							// Get end battery level
 							IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
 							Intent battery = getApplicationContext().registerReceiver(null, ifilter);
-							endLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-							Log.d(LOG_TAG, "Battery level at end " + endLevel);
+							int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+							
+							Log.d(LOG_TAG, String.format("Battery level at end %d: %d ", endLevel, scale));
 							//  Stop all running services
 							if(locateServiceStarted) {
 					    		stopService(locateServiceIntent);	
@@ -187,7 +191,7 @@ public class SensiLoc extends Activity {
 						  	}
 						  	//tv_result.setText("Test is over, used battery level " + (endLevel-startLevel));
 							Toast.makeText(getApplicationContext(), "Time out, used battery level "
-									+ (endLevel-startLevel), Toast.LENGTH_LONG).show();
+									+ (startLevel-endLevel), Toast.LENGTH_LONG).show();
 
 							Looper.loop();
 							
@@ -268,7 +272,9 @@ public class SensiLoc extends Activity {
 				IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
 				Intent battery = getApplicationContext().registerReceiver(null, ifilter);
 				startLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-				Log.d(LOG_TAG, "Battery level at start " + startLevel);
+				int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+				
+				Log.d(LOG_TAG, String.format("Battery level at start %d: %d", startLevel, scale));
 				
 				// Start services 
 				startService(locateServiceIntent);
@@ -288,8 +294,9 @@ public class SensiLoc extends Activity {
 						IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
 						Intent battery = getApplicationContext().registerReceiver(null, ifilter);
 						endLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+						int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
 						
-						Log.d(LOG_TAG, "Battery level at end " + endLevel);
+						Log.d(LOG_TAG, String.format("Battery level at end %d: %d ", endLevel, scale));
 						//  Stop all running services
 						if(locateServiceStarted) {
 				    		stopService(locateServiceIntent);	
@@ -303,8 +310,8 @@ public class SensiLoc extends Activity {
 					  		mainHandler.sendEmptyMessage(0);
 					  	}
 					  	//tv_result.setText("Test is over, used battery level " + (endLevel-startLevel));
-						Toast.makeText(getApplicationContext(), "Time out, used battery level "
-								+ (endLevel-startLevel), Toast.LENGTH_LONG).show();
+						Toast.makeText(getApplicationContext(), "Test over, used battery level "
+								+ (startLevel-endLevel), Toast.LENGTH_LONG).show();
 						
 						Looper.loop();
 						
