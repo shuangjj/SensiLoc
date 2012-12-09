@@ -8,6 +8,9 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
@@ -15,6 +18,7 @@ import android.widget.Toast;
 
 import edu.temple.cis8590.sensiloc.*;
 public class SensiService extends Service implements SensorEventListener{
+	Ringtone r = null;
 	private SensorManager sm;
     private Sensor mAcceler;
     private Sensor mMagnetic;
@@ -40,6 +44,9 @@ public class SensiService extends Service implements SensorEventListener{
 	}
 	@Override
 	public void onCreate() {
+		// Ringtone setup
+		Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+	    r = RingtoneManager.getRingtone(getApplicationContext(), notification);
 		// Sensors initialization
         sm = (SensorManager)getSystemService(SENSOR_SERVICE);
         List<Sensor> sens = sm.getSensorList(Sensor.TYPE_ACCELEROMETER);
@@ -58,6 +65,7 @@ public class SensiService extends Service implements SensorEventListener{
         			String.format("\n\tmagnetic field:") + mMagnetic);
         	
         }
+        
 	}
 	@Override
 	public void onDestroy() {
@@ -104,7 +112,6 @@ public class SensiService extends Service implements SensorEventListener{
 				angleDelta += delta;
 				if(Math.abs(angleDelta)>THRESHOLD) {
 					angleDelta = 0;
-					Toast.makeText(this, "Change direction", Toast.LENGTH_SHORT).show();
 					// Notify locateService about the  direction changing event
 					Intent notifyLocateServiceIntent = new Intent(this, LocateService.class);
 					
@@ -113,6 +120,11 @@ public class SensiService extends Service implements SensorEventListener{
 					
 					notifyLocateServiceIntent.putExtras(extras);
 					startService(notifyLocateServiceIntent);
+					Toast.makeText(this, "Change direction", Toast.LENGTH_SHORT).show();
+					// Audio Notification
+					if(!r.isPlaying())
+						r.play();
+				    
 				}
 			}
 			lastAzimuth = azimuth;//Math.round(mOrientation[0]*rad2deg);

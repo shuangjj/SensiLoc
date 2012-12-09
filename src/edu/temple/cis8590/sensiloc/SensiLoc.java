@@ -20,6 +20,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.util.Log;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.ArrayAdapter;
@@ -35,13 +36,15 @@ import edu.temple.cis8590.sensiloc.services.*;
 public class SensiLoc extends Activity {
     public static final String LOG_TAG = "SensiLoc";
     public static final String KEY_METHOD = "sensiloc.methods";
-    public static final String KEY_FREQ = "sensiloc.freq";
-  
-    
+    public static final String KEY_UTFREQ = "sensiloc.utfreq";
+    public static final String KEY_RDFREQ = "sensiloc.rdfreq";
+    public static final String KEY_TURN_DELAY = "sensiloc.turndelay";
    
     // Layout views 
     EditText et_time;
-    EditText et_freq;
+    EditText et_utfreq;
+    EditText et_rdfreq;
+    EditText et_turn_delay;
     TextView tv_result;
     Spinner method_spinner;
     
@@ -77,29 +80,62 @@ public class SensiLoc extends Activity {
         
         // Time & Frequency
         et_time = (EditText)findViewById(R.id.editText_time);
-        et_freq = (EditText)findViewById(R.id.editText_freq);
+        et_utfreq = (EditText)findViewById(R.id.editText_utfreq);
+        et_rdfreq = (EditText)findViewById(R.id.editText_rdfreq);
+        et_turn_delay = (EditText)findViewById(R.id.editText_turn_delay);
         tv_result = (TextView)findViewById(R.id.textView_result);
         // Start button
         Button but_start = (Button)findViewById(R.id.button_start);
         but_start.setOnClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				// TODO: validate inputs
-				int freq = 0;
-				if((et_freq != null) && !et_freq.getText().toString().trim().equals("")) {
-					Log.d(SensiLoc.LOG_TAG, "Freq: "+et_freq.getText().toString().trim()+".");
-					freq = Integer.valueOf(et_freq.getText().toString().trim()).intValue();
-				}
+				// Experiment time
 				if( (et_time !=null) && !et_time.getText().toString().trim().equals("")) {
 					exper_time = Integer.valueOf(et_time.getText().toString().trim()).longValue();
+				} else {
+					// TODO: ~~
+					return;
 				}
-				method = method_spinner.getSelectedItem().toString();
-				Log.d(SensiLoc.LOG_TAG, "Put (freq, "+freq+") (method, "+method+") to Intent");
+				// Location update frequency and record frequency
+				int utfreq = 0;
+				if((et_utfreq != null) && !et_utfreq.getText().toString().trim().equals("")) {
+					utfreq = Integer.valueOf(et_utfreq.getText().toString().trim()).intValue();
+					
+				} else {
+					// TODO: AlartDialog prompt user set frequency
+					return;
+				}
 				
+				int rdfreq = 0;
+				if((et_rdfreq != null) && !et_rdfreq.getText().toString().trim().equals("")) {
+					rdfreq = Integer.valueOf(et_rdfreq.getText().toString().trim()).intValue();
+					
+				} else {
+					// TODO: AlartDialog prompt user set frequency
+					return;
+				}
+				// Locating method
+				method = method_spinner.getSelectedItem().toString();
+				// Turning delay time
+				int turn_delay = 0;
+				if(method.equals("Adaptive")) {
+					if((et_turn_delay != null) && !et_turn_delay.getText().toString().trim().equals("")) {
+						turn_delay = Integer.valueOf(et_turn_delay.getText().toString().trim()).intValue();
+						
+					} else {
+						// TODO: AlartDialog prompt user set frequency
+						return;
+					}
+				}
 				/* Add extras and start location record service */
 				locateServiceIntent = new Intent(v.getContext(), LocateService.class);
 				Bundle locateBundle = new Bundle();
-				locateBundle.putInt(KEY_FREQ, freq);
+				
+				locateBundle.putInt(KEY_UTFREQ, utfreq);
+				locateBundle.putInt(KEY_RDFREQ, rdfreq);
+				if(method.equals("Adaptive")) {
+					locateBundle.putInt(KEY_TURN_DELAY, turn_delay);
+				}
 				locateBundle.putString(KEY_METHOD, method);
 				locateServiceIntent.putExtras(locateBundle);
 				/* sensiService */
@@ -344,10 +380,23 @@ public class SensiLoc extends Activity {
     	}
     	super.onDestroy();
     }
+    
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
+    	super.onCreateOptionsMenu(menu);
         getMenuInflater().inflate(R.menu.activity_main, menu);
         return true;
        
+    }
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+    	switch(item.getItemId()) {
+    	case R.id.menu_settings:
+    		startActivity(new Intent(this, SettingsActivity.class));
+    		break;
+    	default:
+    		return false;
+    	}
+    	return true;
     }
 }

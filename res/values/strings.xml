@@ -2,7 +2,7 @@
 
     <string name="app_name">SensiLoc</string>
     <string name="exper_time">Experiment Time:</string>
-    <string name="menu_settings">Settings</string>
+    <string name="menu_settings">Options</string>
     <string name="title_activity_main">SensiLoc</string>
 
     <string-array name="method">

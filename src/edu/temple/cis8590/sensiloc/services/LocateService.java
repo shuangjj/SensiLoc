@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -31,11 +32,12 @@ import edu.temple.cis8590.sensiloc.*;
 public class LocateService extends Service {
 	private static final String LOG_TAG = "LocateService";
 	// User setup from SensiLoc Activity
-	private int freq;
+	private int utfreq;			// Location update frequency
+	int rdfreq; 				// Record frequency;
+	int turn_delay; 	// Turning delay time
 	private String method;
 	
-	
-	
+
 	private static int PRECISION = 3;
 
 
@@ -132,12 +134,17 @@ public class LocateService extends Service {
 				}
 				
 			}
-			// Send request for location record
+			// Send request to handler for location record
 			if(location != null) {
+				
+				Timestamp ts = new Timestamp(System.currentTimeMillis());
+				record.timestamp = ts.toString();
 				record.location = location;
-				record.where = method;
+				record.provider = (!method.equals("Adaptive")) ? method : (curStatus == MovingStatus.STRAIGHT) ? "Network" : 
+					"GPS";
 				Message msg = new Message();
 				msg.what = 0;
+				
 				msg.obj = (Object)record;
 				sdhelper.handler.sendMessage(msg);
 				
@@ -182,11 +189,14 @@ public class LocateService extends Service {
 		Bundle bundle = intent.getExtras();
 		
 		// Intents from Main Activity
-		if(bundle.containsKey(SensiLoc.KEY_FREQ)) {
+		if(bundle.containsKey(SensiLoc.KEY_METHOD)) {
 			// Get Intent extras
-			freq = bundle.getInt(SensiLoc.KEY_FREQ);
+			utfreq = bundle.getInt(SensiLoc.KEY_UTFREQ);
+			rdfreq = bundle.getInt(SensiLoc.KEY_RDFREQ);
 			method = bundle.getString(SensiLoc.KEY_METHOD);
-			
+			if(method.equals("Adaptive")) {
+				turn_delay = bundle.getInt(SensiLoc.KEY_TURN_DELAY);
+			}
 			// Start HandlerThread for location recording
 			if(sdhelper == null) {
 				sdhelper = new SDRecordHelper();
@@ -198,15 +208,15 @@ public class LocateService extends Service {
 			// Create record files and  request update
 			if(method.equals("GPS")) {
 				
-				lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, freq, 0, listener);
+				lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, utfreq*1000, 0, listener);
 				curMethod = LocateMethod.LOCATE_GPS;
 				
 			} else if(method.equals("Network")) {
-				lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, freq, 0, listener);
+				lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, utfreq*1000, 0, listener);
 				curMethod = LocateMethod.LOCATE_NETWORK;
 				
 			} else { // Adaptive 
-				lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, listener);
+				lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, utfreq*1000, 0, listener);
 				
 				AdaptLocationThread thread = new AdaptLocationThread();
 				thread.start();
@@ -214,15 +224,14 @@ public class LocateService extends Service {
 			}
 			
 			sdhelper.createFiles();
-			Toast.makeText(this, "Start service: Frequency: "+freq+", method: "+method, Toast.LENGTH_SHORT).show();
-			
-			
+			Toast.makeText(this, "Locate service:\n\tUpdate frequency: " + utfreq
+					+ "\n\tmethod: " + method, Toast.LENGTH_SHORT).show();
 			
 			// Start time task for periodically recording location
 			if(locateTimer==null) {
 				
 				locateTimer = new Timer();
-				locateTimer.schedule(locateTask, freq, freq);
+				locateTimer.schedule(locateTask, rdfreq, rdfreq);
 			}
 		} else {
 			// Intent from SensiService
@@ -246,7 +255,7 @@ public class LocateService extends Service {
 							curStatus = MovingStatus.STRAIGHT;
 						}
 						
-					}, 1*1000*60);
+					}, turn_delay*1000);
 				}
 			} // VAL_TURNING
 		}
@@ -275,12 +284,12 @@ public class LocateService extends Service {
 						break;
 					case MSG_GPS:
 						lm.removeUpdates(listener);
-						lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, listener);
+						lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, utfreq*1000, 0, listener);
 						Toast.makeText(getApplicationContext(), "get update by GPS", Toast.LENGTH_SHORT).show();
 						break;
 					case MSG_NETWORK:
 						lm.removeUpdates(listener);
-						lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, listener);
+						lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, utfreq*1000, 0, listener);
 						Toast.makeText(getApplicationContext(), "get update by Network", Toast.LENGTH_SHORT).show();
 						break;
 					default:
@@ -296,8 +305,10 @@ public class LocateService extends Service {
 	 * Class for location record
 	 */
 	class MyLocationRecord {
+		public String provider;
 		public Location location;
 		public String where;
+		public String timestamp;
 		public MyLocationRecord() {
 			
 		}
@@ -384,10 +395,11 @@ public class LocateService extends Service {
 					: ((curStatus == MovingStatus.STRAIGHT) ? "Network" : "GPS")) + " ("+longitude
 					+ ", " + latitude + ")");
 			// Fill record buffer
-			StringBuffer buf = new StringBuffer();
+			StringBuffer buf = new StringBuffer(); 
+			buf.append(record.timestamp); buf.append("\t");
+			buf.append(record.provider); buf.append("\t");
+			buf.append(latitude); buf.append("\t");
 			buf.append(longitude);
-			buf.append("\t");
-			buf.append(latitude);
 			buf.append("\n");
 		
 			if(fp == null) {
