@@ -18,6 +18,8 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Handler.Callback;
+import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
@@ -35,12 +37,11 @@ public class LocateService extends Service {
 	
 	
 	private static int PRECISION = 3;
-	private File gpsFp, networkFp, adaptFp;
-	private StringBuffer buf;
-	private int num_records = 0;
+
+
+	SDRecordHelper sdhelper = null;
 	
 	private LocationManager lm;
-	private Location location = null;
 	private Timer locateTimer = null;
 	
 	private Handler adaptHandler = null;
@@ -51,12 +52,20 @@ public class LocateService extends Service {
 	public static final int MSG_QUIT = 0;
 	public static final int MSG_GPS = 1;
 	public static final int MSG_NETWORK = 2;
-	
+	// Moving status enumeration
 	enum MovingStatus{
 		TURNING,
 		STRAIGHT
 		}; 
+	// Localization method enumeration
+	enum LocateMethod {
+		LOCATE_GPS,
+		LOCATE_NETWORK,
+		LOCATE_ADAPTIVE
+	}
+	
 	private MovingStatus curStatus;
+	LocateMethod curMethod;
 	
 	public LocateService() {
 	}
@@ -92,56 +101,7 @@ public class LocateService extends Service {
 		}
 		
 	};
-	public void record(File fp)
-	{
-		double longitude = Math.round(location.getLongitude()*Math.pow(10, PRECISION))/Math.pow(10, PRECISION);
-		double latitude = Math.round(location.getLatitude()*Math.pow(10, PRECISION))/Math.pow(10, PRECISION);
-		if(location != null) {
-			Log.i(LocateService.LOG_TAG, "get location by "+ (!method.equals("Adaptive") ? method
-					: ((curStatus == MovingStatus.STRAIGHT) ? "Network" : "GPS")) + " ("+longitude
-					+ ", " + latitude + ")");
-		}else {
-			Log.i(LocateService.LOG_TAG, "get location by " + method + " failed");
-		}
-		
-		buf.append(longitude);
-		buf.append("\t");
-		buf.append(latitude);
-		buf.append("\n");
-		++num_records;
-		if(num_records>=10) {
-			// Writing records
-			if(fp.exists() && fp.canWrite()) {
-				FileOutputStream fos = null;
-				FileWriter fw = null;
-				BufferedWriter bw = null;
-				try {
-					fw = new FileWriter(fp, true);
-					bw = new BufferedWriter(fw);
-					
-					bw.write(buf.toString());
-					
-				} catch (IOException e) {
-					Log.e(SensiLoc.LOG_TAG, "Error writing ...", e);
-				} finally {
-					if(bw != null) {
-						try {
-							bw.close();
-						} catch(IOException e) {
-							// TODO: swallow
-						}
-					}
-					buf = new StringBuffer();
-					num_records = 0;
-					
-				}
-				
-			}else { // gpsFp.exists()
-				Log.e(SensiLoc.LOG_TAG, "Error writing to file");
-			}
-			
-		}
-	}
+	
 	/*
 	 * Timer Task
 	 * Periodically get last known location from respective location provider
@@ -149,6 +109,8 @@ public class LocateService extends Service {
 	TimerTask locateTask = new TimerTask() {
 		@Override
 		public void run() {
+			Location location = null;
+			MyLocationRecord  record = new MyLocationRecord();
 			if(method.equals("GPS")) {
 				//Intent gpsUpdateIntent = new Intent();
 				//final PendingIntent launchIntent = PendingIntent.getBroadcast(LocateService.this, 5000, gpsUpdateIntent, 0);
@@ -156,15 +118,11 @@ public class LocateService extends Service {
 				//lm.requestSingleUpdate(LocationManager.GPS_PROVIDER, listener, );
 
 				location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-				// Record location
-				if(location != null) 
-					record(gpsFp);
+				
 				
 			} else if(method.equals("Network")) {
 				location = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-				// Record location
-				if(location != null) 
-					record(networkFp);
+				
 			} else if(method.equals("Adaptive")) {
 				// Get location based on the current moving status
 				if(curStatus == MovingStatus.STRAIGHT) {
@@ -172,9 +130,19 @@ public class LocateService extends Service {
 				} else if(curStatus == MovingStatus.TURNING) {
 					location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
 				}
-				// Record location
-				if(location != null) 
-					record(adaptFp);
+				
+			}
+			// Send request for location record
+			if(location != null) {
+				record.location = location;
+				record.where = method;
+				Message msg = new Message();
+				msg.what = 0;
+				msg.obj = (Object)record;
+				sdhelper.handler.sendMessage(msg);
+				
+			} else {
+				
 			}
 			
 		}
@@ -184,38 +152,9 @@ public class LocateService extends Service {
 	 */
 	@Override
 	public void onCreate() {
-		// Create files in sdcard for location recording
-		File sdDir = new File("/sdcard/");
-		if(sdDir.exists() && sdDir.canWrite()) {
-			File sensiDir = new File(sdDir.getAbsolutePath()+"/sensiloc/");
-			if(sensiDir.isDirectory()) {
-				// Delete old files if exist
-				for(File f:sensiDir.listFiles()) {
-					f.delete();
-				}
-				
-			}
-			else sensiDir.mkdir();
-			
-			if(sensiDir.exists() && sensiDir.canWrite()) {
-				gpsFp = new File(sensiDir.getAbsolutePath()+"/GPS_Record.txt");
-				networkFp = new File(sensiDir.getAbsoluteFile()+"/Net_Record.txt");
-				adaptFp = new File(sensiDir.getAbsoluteFile()+"/Adapt_Record.txt");
-				
-				try {
-					gpsFp.createNewFile();
-					networkFp.createNewFile();
-					adaptFp.createNewFile();
-				}catch(IOException e) {
-					Log.e(LOG_TAG, "Error creating files under "+sensiDir.getPath(), e);
-				}
-
-			} else { // sensiDir.exists()
-				Log.e(LOG_TAG, "unable to write to /sdcard/sensiloc/");
-			}
-		} else { // sdDir.exists
-			Log.e(LOG_TAG, "/sdcard not available");
-		}
+		
+		//
+		sdhelper = new SDRecordHelper();
 		
 		// Location Manager
 		lm = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
@@ -225,8 +164,6 @@ public class LocateService extends Service {
 		for(String provider : providers) {
 			Log.i(LOG_TAG, "provider: " + provider);
 		}
-		// Initialize buffer for the records
-		buf = new StringBuffer();
 		// Initialize current moving status
 		curStatus = MovingStatus.STRAIGHT;
 		
@@ -243,24 +180,45 @@ public class LocateService extends Service {
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
 		Bundle bundle = intent.getExtras();
-		// Intents from SensiLoc Activity
+		
+		// Intents from Main Activity
 		if(bundle.containsKey(SensiLoc.KEY_FREQ)) {
 			// Get Intent extras
 			freq = bundle.getInt(SensiLoc.KEY_FREQ);
 			method = bundle.getString(SensiLoc.KEY_METHOD);
 			
+			// Start HandlerThread for location recording
+			if(sdhelper == null) {
+				sdhelper = new SDRecordHelper();
+				//sdhelper.createFiles();
+			}
+			if(!sdhelper.t.isAlive()) {
+				sdhelper.t.start();
+			}
+			// Create record files and  request update
 			if(method.equals("GPS")) {
+				
 				lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, freq, 0, listener);
+				curMethod = LocateMethod.LOCATE_GPS;
+				
 			} else if(method.equals("Network")) {
 				lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, freq, 0, listener);
+				curMethod = LocateMethod.LOCATE_NETWORK;
+				
 			} else { // Adaptive 
-				// Initialize current moving status from SharedPreference
 				lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, listener);
+				
 				AdaptLocationThread thread = new AdaptLocationThread();
 				thread.start();
+				curMethod = LocateMethod.LOCATE_ADAPTIVE;
 			}
+			
+			sdhelper.createFiles();
 			Toast.makeText(this, "Start service: Frequency: "+freq+", method: "+method, Toast.LENGTH_SHORT).show();
-			// Start recording location, freq in milliseconds
+			
+			
+			
+			// Start time task for periodically recording location
 			if(locateTimer==null) {
 				
 				locateTimer = new Timer();
@@ -333,6 +291,163 @@ public class LocateService extends Service {
 			Looper.loop();
 		}
 	}
+
+	/*
+	 * Class for location record
+	 */
+	class MyLocationRecord {
+		public Location location;
+		public String where;
+		public MyLocationRecord() {
+			
+		}
+		
+	}
+	/*
+	 * Helper class for writing location record into SD card
+	 */
+	class SDRecordHelper  implements Callback {
+		
+		File fp = null;
+		
+		HandlerThread t;
+		Handler handler;
+		static final String SD_DIR = "/sdcard/sensiloc/";
+		public SDRecordHelper() {
+			
+			// Initialize HandlerThread
+			t = new HandlerThread("Location Record");
+			t.start();
+			Looper looper = t.getLooper();
+			// TODO: looper ? null
+			handler = new Handler(looper, this);
+		}
+		/*
+		 * Create record files on SD card
+		 */
+		public boolean createFiles() {
+			// Create files in SD card for location recording
+			File sdDir = new File("/sdcard/");
+			if(sdDir.exists() && sdDir.canWrite()) {
+				File sensiDir = new File(sdDir.getAbsolutePath()+"/sensiloc/");
+				if(sensiDir.isDirectory()) {
+					// Delete old files if exist
+					/*for(File f:sensiDir.listFiles()) {
+						f.delete();
+					}*/
+					
+				}
+				else sensiDir.mkdir();
+				// Create files and assign corresponding file handler
+				if(sensiDir.exists() && sensiDir.canWrite()) {
+					
+					fp = new File(sensiDir.getAbsoluteFile()+((curMethod == LocateMethod.LOCATE_GPS) ? "/GPS_Record.txt" :
+						(curMethod == LocateMethod.LOCATE_NETWORK) ? "/Network_Record.txt" : "/Adapt_Record.txt") );
+					
+					if(fp.exists()) {
+						fp.delete();
+					}
+					try {
+						fp.createNewFile();
+					}catch(IOException e) {
+						Log.e(LOG_TAG, "Error creating files under "+sensiDir.getPath(), e);
+						return false;
+					} 
+
+				} else { // sensiDir.exists()
+					Log.e(LOG_TAG, "unable to write to /sdcard/sensiloc/");
+					return false;
+				}
+			} else { // sdDir.exists
+				Log.e(LOG_TAG, "/sdcard not available");
+				return false;
+			}
+			return true;
+		}
+		/*
+		 * 
+		 */
+		public void sendLocationRecord(MyLocationRecord record) {
+
+				Message msg = new Message();
+				msg.what = 0;
+				msg.obj = (Object)record;
+				handler.sendMessage(msg);
+
+		}
+		private boolean writeLocationRecord(MyLocationRecord record)
+		{
+			Location location = record.location;
+			double longitude = location.getLongitude(); //Math.round(location.getLongitude()*Math.pow(10, PRECISION))/Math.pow(10, PRECISION);
+			double latitude = location.getLatitude(); //Math.round(location.getLatitude()*Math.pow(10, PRECISION))/Math.pow(10, PRECISION);
+			Log.i(LocateService.LOG_TAG, "get location by "+ (!method.equals("Adaptive") ? method
+					: ((curStatus == MovingStatus.STRAIGHT) ? "Network" : "GPS")) + " ("+longitude
+					+ ", " + latitude + ")");
+			// Fill record buffer
+			StringBuffer buf = new StringBuffer();
+			buf.append(longitude);
+			buf.append("\t");
+			buf.append(latitude);
+			buf.append("\n");
+		
+			if(fp == null) {
+				fp = new File(SDRecordHelper.SD_DIR+((curMethod == LocateMethod.LOCATE_GPS) ? "/GPS_Record.txt" :
+					(curMethod == LocateMethod.LOCATE_NETWORK) ? "/Network_Record.txt" : "/Adapt_Record.txt") );
+			}
+			// Writing records
+			if(fp.exists() && fp.canWrite()) {
+				FileOutputStream fos = null;
+				FileWriter fw = null;
+				BufferedWriter bw = null;
+				try {
+					fw = new FileWriter(fp, true);
+					bw = new BufferedWriter(fw);
+					bw.write(buf.toString());
+					
+				} catch (IOException e) {
+					Log.e(SensiLoc.LOG_TAG, "Error writing ...", e);
+					return false;
+				} finally {
+					if(bw != null) {
+						try {
+							bw.close();
+							fw.close();
+						} catch(IOException e) {
+							// TODO: swallow
+						}
+					}
+
+					
+				}
+				
+			}else { // gpsFp.exists()
+				Log.e(SensiLoc.LOG_TAG, "Error writing to file");
+				return false;
+			}
+			return true;
+		}
+		
+		@Override
+		public boolean handleMessage(Message msg) {
+			switch(msg.what) {
+			case 0:
+				MyLocationRecord rd = (MyLocationRecord) msg.obj;
+				writeLocationRecord(rd);
+				break;
+			default:
+				return false;
+			}
+			
+			return true;
+		}
+		/*
+		 * Quit handler
+		 */
+		public void stopHandler() {
+			t.quit();
+		}
+	}
+	
 	@Override
 	public void onDestroy() {
 		Log.d(SensiLoc.LOG_TAG, "LocateService to be destroyed");
@@ -347,40 +462,15 @@ public class LocateService extends Service {
 		}
 		
 		lm.removeUpdates(listener);
-		// Quit looper
+		// Quit looper for changing locating method
 		if(adaptHandler!=null)
 			adaptHandler.sendEmptyMessage(0);
+		// Quit thread handler for recording into SD card
+		if(sdhelper != null) {
+			sdhelper.stopHandler();
 		
-		// 
-		if(num_records>0) {
-			File fp = method.equals("GPS")?gpsFp:(method.equals("Network")?networkFp:adaptFp);
-			// Writing records
-			if(fp.exists() && fp.canWrite()) {
-				FileOutputStream fos = null;
-				FileWriter fw = null;
-				BufferedWriter bw = null;
-				try {
-					fw = new FileWriter(fp, true);
-					bw = new BufferedWriter(fw);
-					
-					bw.write(buf.toString());
-					
-				} catch (IOException e) {
-					Log.e(LOG_TAG, "Error writing ...", e);
-				} finally {
-					if(bw != null) {
-						try {
-							bw.close();
-						} catch(IOException e) {
-							// TODO: swallow
-						}
-					}					
-				}
-				
-			}else { // gpsFp.exists()
-				Log.e(LOG_TAG, "Error writing to file");
-			}
 		}
+	
 		super.onDestroy();
 	}
 }

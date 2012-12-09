@@ -318,6 +318,7 @@ public class SensiLoc extends Activity {
 					}
 		        	
 		        }, exper_time*60*1000);
+		        
 		        tv_result.setText("Running...");
     		} else {
     			Toast.makeText(this, "start GPS failed, returned " + resultCode, Toast.LENGTH_SHORT).show();
@@ -327,6 +328,11 @@ public class SensiLoc extends Activity {
     }
     @Override
     public void onStop() {
+    	
+    	super.onStop();
+    }
+    @Override
+    public void onDestroy() {
     	// Clean up services created
     	if(sensiServiceStarted) {
     		stopService(sensiServiceIntent);
@@ -336,7 +342,7 @@ public class SensiLoc extends Activity {
     		stopService(locateServiceIntent);
     		locateServiceStarted = false;
     	}
-    	super.onStop();
+    	super.onDestroy();
     }
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
