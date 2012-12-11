@@ -9,6 +9,7 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Looper;
 import android.os.Message;
+import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -18,6 +19,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -38,8 +40,9 @@ public class SensiLoc extends Activity {
     public static final String KEY_METHOD = "sensiloc.methods";
     public static final String KEY_UTFREQ = "sensiloc.utfreq";
     public static final String KEY_RDFREQ = "sensiloc.rdfreq";
-    public static final String KEY_TURN_DELAY = "sensiloc.turndelay";
+    public static final String KEY_TURN_DELAY = "sensiloc.turn_delay";
    
+    public static final String KEY_TURN_ANGLE = "sensiloc.turn_angle";
     // Layout views 
     EditText et_time;
     EditText et_utfreq;
@@ -47,6 +50,7 @@ public class SensiLoc extends Activity {
     EditText et_turn_delay;
     TextView tv_result;
     Spinner method_spinner;
+    Spinner spinner_turning_angle;
     
     String method;
     long exper_time = 0;
@@ -84,6 +88,13 @@ public class SensiLoc extends Activity {
         et_rdfreq = (EditText)findViewById(R.id.editText_rdfreq);
         et_turn_delay = (EditText)findViewById(R.id.editText_turn_delay);
         tv_result = (TextView)findViewById(R.id.textView_result);
+        // turning angle spinner adapter setup
+        spinner_turning_angle = (Spinner)findViewById(R.id.spinner_turning_angle);
+        ArrayAdapter<String> angles = 
+        		new ArrayAdapter(this, android.R.layout.simple_spinner_item, 
+        				this.getResources().getStringArray(R.array.turning_angles));
+        angles.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner_turning_angle.setAdapter(angles);
         // Start button
         Button but_start = (Button)findViewById(R.id.button_start);
         but_start.setOnClickListener(new OnClickListener() {
@@ -118,10 +129,11 @@ public class SensiLoc extends Activity {
 				method = method_spinner.getSelectedItem().toString();
 				// Turning delay time
 				int turn_delay = 0;
+				int turn_angle = 0;
 				if(method.equals("Adaptive")) {
 					if((et_turn_delay != null) && !et_turn_delay.getText().toString().trim().equals("")) {
 						turn_delay = Integer.valueOf(et_turn_delay.getText().toString().trim()).intValue();
-						
+						turn_angle = Integer.valueOf(spinner_turning_angle.getSelectedItem().toString());
 					} else {
 						// TODO: AlartDialog prompt user set frequency
 						return;
@@ -140,6 +152,11 @@ public class SensiLoc extends Activity {
 				locateServiceIntent.putExtras(locateBundle);
 				/* sensiService */
 				sensiServiceIntent = new Intent(v.getContext(), SensiService.class);
+				Bundle sensiBundle = new Bundle();
+				if(method.equals("Adaptive")) {
+					sensiBundle.putInt(KEY_TURN_ANGLE, turn_angle);
+				}
+				sensiServiceIntent.putExtras(sensiBundle);
 				
 				/* Check Network and GPS allowance */
 				LocationManager lm = (LocationManager) v.getContext().getSystemService(Context.LOCATION_SERVICE);
@@ -247,7 +264,8 @@ public class SensiLoc extends Activity {
 
 			@Override
 			public void onClick(View v) {
-				main_timer.cancel();
+				if(main_timer != null)
+					main_timer.cancel();
 			  	if(locateServiceStarted) {
 		    		stopService(locateServiceIntent);	
 		    		locateServiceStarted = false;
@@ -257,6 +275,9 @@ public class SensiLoc extends Activity {
 			  		sensiServiceStarted = false;
 			  	}
 			  	tv_result.setText("Stopped");
+			  	// Test codes
+			  /*	SharedPreferences musicPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+			  	tv_result.append("\t" + musicPref.getString("example_text", ""));*/
 			  	Toast.makeText(v.getContext(), "Services stopped", Toast.LENGTH_SHORT).show();
 			}
         	

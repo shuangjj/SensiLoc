@@ -224,14 +224,14 @@ public class LocateService extends Service {
 			}
 			
 			sdhelper.createFiles();
-			Toast.makeText(this, "Locate service:\n\tUpdate frequency: " + utfreq
-					+ "\n\tmethod: " + method, Toast.LENGTH_SHORT).show();
+		/*	Toast.makeText(this, "Locate service:\n\tUpdate frequency: " + utfreq
+					+ "\n\tmethod: " + method, Toast.LENGTH_SHORT).show();*/
 			
 			// Start time task for periodically recording location
 			if(locateTimer==null) {
 				
 				locateTimer = new Timer();
-				locateTimer.schedule(locateTask, rdfreq, rdfreq);
+				locateTimer.schedule(locateTask, rdfreq*1000, rdfreq*1000);
 			}
 		} else {
 			// Intent from SensiService

@@ -4,6 +4,7 @@ import java.util.List;
 
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -13,6 +14,7 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -36,7 +38,12 @@ public class SensiService extends Service implements SensorEventListener{
     private boolean lastOrientationSet = false;
     private final float rad2deg = 180/(float)Math.PI;
     private int THRESHOLD = 90;
+    int ANGLE_FILTER_HIGH = 250;
+    int ANGLE_FILTER_LOW = 3;
+    int turn_angle = 0;
     int angleDelta = 0;
+    
+    SharedPreferences musicPref = null;
 	@Override
 	public IBinder onBind(Intent i) {
 		// TODO Auto-generated method stub
@@ -47,6 +54,7 @@ public class SensiService extends Service implements SensorEventListener{
 		// Ringtone setup
 		Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
 	    r = RingtoneManager.getRingtone(getApplicationContext(), notification);
+	    musicPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
 		// Sensors initialization
         sm = (SensorManager)getSystemService(SENSOR_SERVICE);
         List<Sensor> sens = sm.getSensorList(Sensor.TYPE_ACCELEROMETER);
@@ -55,7 +63,16 @@ public class SensiService extends Service implements SensorEventListener{
         sens = sm.getSensorList(Sensor.TYPE_MAGNETIC_FIELD);
         mMagnetic = (sens.size() == 0) ? null : sens.get(0);
         
-        if( (mAcceler != null) && (mMagnetic != null) ){
+        
+        
+	}
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+		Bundle bundle = intent.getExtras();
+		turn_angle = bundle.getInt(SensiLoc.KEY_TURN_ANGLE);
+		Log.d(SensiLoc.LOG_TAG, "Set turn_angle from SensiLoc to " + turn_angle);
+		
+		if( (mAcceler != null) && (mMagnetic != null) ){
         	
         	sm.registerListener(this, mAcceler, SensorManager.SENSOR_DELAY_NORMAL);
         	sm.registerListener(this, mMagnetic, SensorManager.SENSOR_DELAY_NORMAL);
@@ -65,7 +82,9 @@ public class SensiService extends Service implements SensorEventListener{
         			String.format("\n\tmagnetic field:") + mMagnetic);
         	
         }
-        
+		
+		super.onStartCommand(intent, flags, startId);
+		return START_REDELIVER_INTENT;
 	}
 	@Override
 	public void onDestroy() {
@@ -89,7 +108,7 @@ public class SensiService extends Service implements SensorEventListener{
 		} else if(event.sensor == mMagnetic) {
 			System.arraycopy(event.values, 0, mLastMagneticValue, 0, event.values.length);
 			mLastMagneticSet = true;
-			Log.d(SensiLoc.LOG_TAG, String.format("Geomagnetic Field Sensor: %f", mLastMagneticValue[1]));
+			//Log.d(SensiLoc.LOG_TAG, String.format("Geomagnetic Field Sensor: %f", mLastMagneticValue[1]));
 		}
 		if(mLastAccelerSet && mLastMagneticSet) {
 			boolean ret = SensorManager.getRotationMatrix(mRotationMatrix, null, mLastAccelerValue, mLastMagneticValue);
@@ -109,8 +128,12 @@ public class SensiService extends Service implements SensorEventListener{
 			}
 			if(lastOrientationSet) {
 				int delta = azimuth-lastAzimuth;
+				// Filter noise
+				if(Math.abs(delta) < ANGLE_FILTER_LOW || Math.abs(delta) > ANGLE_FILTER_HIGH) {
+					delta = 0;
+				}
 				angleDelta += delta;
-				if(Math.abs(angleDelta)>THRESHOLD) {
+				if(Math.abs(angleDelta)>turn_angle) {
 					angleDelta = 0;
 					// Notify locateService about the  direction changing event
 					Intent notifyLocateServiceIntent = new Intent(this, LocateService.class);
@@ -122,8 +145,10 @@ public class SensiService extends Service implements SensorEventListener{
 					startService(notifyLocateServiceIntent);
 					Toast.makeText(this, "Change direction", Toast.LENGTH_SHORT).show();
 					// Audio Notification
-					if(!r.isPlaying())
-						r.play();
+					if(musicPref.getBoolean("music_checkbox", true)) {
+						if(!r.isPlaying())
+							r.play();
+					}
 				    
 				}
 			}

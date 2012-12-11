@@ -4,7 +4,9 @@
 
     <!-- Strings related to Settings -->
 
-
+	<!-- Settings -->
+	<string name="pref_title_music_enable">Enable turning audio notif</string>
+	<string name="pref_description_music_enable">Notif by Ringtone when turning</string>
     <!-- Example General settings -->
     <string name="pref_header_general">General</string>
     <string name="pref_title_social_recommendations">Enable social recommendations</string>
