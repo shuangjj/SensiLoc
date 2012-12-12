@@ -4,9 +4,33 @@
 
     <!-- Strings related to Settings -->
 
-	<!-- Settings -->
+	<!-- Music -->
 	<string name="pref_title_music_enable">Enable turning audio notif</string>
 	<string name="pref_description_music_enable">Notif by Ringtone when turning</string>
+	<!-- Manual -->
+	<string name="pref_title_manual_enable">Enable manual turning</string>
+	<string name="pref_description_manual_enable">Turn by pressing the turn button</string>
+	
+	<!-- Adaptive method preferences  -->
+	
+	<!-- turning delay -->
+	<string name="pref_header_adaptive">Adaptive</string>
+	<string name="pref_default_turn_delay">60</string>
+	<string name="pref_title_turn_delay">Turn delay</string>
+	<!-- turning angle -->
+	<string name="pref_turn_angle_title">Set turn angle threshold</string>
+	<string-array name="pref_turn_angle_list_titles">
+        <item>90</item>
+        <item>60</item>
+        <item>45</item>
+    </string-array>
+    
+    <string-array name="pref_turn_angle_list_values">
+        <item>90</item>
+        <item>60</item>
+        <item>45</item>
+    </string-array>
+	
     <!-- Example General settings -->
     <string name="pref_header_general">General</string>
     <string name="pref_title_social_recommendations">Enable social recommendations</string>

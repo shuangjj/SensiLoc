@@ -6,9 +6,13 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 import android.location.LocationManager;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Parcelable;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.app.Activity;
@@ -20,6 +24,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -35,7 +40,7 @@ import android.os.BatteryManager;
 import android.os.Handler;
 
 import edu.temple.cis8590.sensiloc.services.*;
-public class SensiLoc extends Activity {
+public class SensiLoc extends Activity implements OnSharedPreferenceChangeListener {
     public static final String LOG_TAG = "SensiLoc";
     public static final String KEY_METHOD = "sensiloc.methods";
     public static final String KEY_UTFREQ = "sensiloc.utfreq";
@@ -43,6 +48,8 @@ public class SensiLoc extends Activity {
     public static final String KEY_TURN_DELAY = "sensiloc.turn_delay";
    
     public static final String KEY_TURN_ANGLE = "sensiloc.turn_angle";
+    
+    public static final String KEY_MAIN_HANDLE = "sensiloc.main_handle";
     // Layout views 
     EditText et_time;
     EditText et_utfreq;
@@ -51,6 +58,7 @@ public class SensiLoc extends Activity {
     TextView tv_result;
     Spinner method_spinner;
     Spinner spinner_turning_angle;
+    Button but_turn;
     
     String method;
     long exper_time = 0;
@@ -67,14 +75,22 @@ public class SensiLoc extends Activity {
     // Battery
     int startLevel = 0;
     int endLevel = 0;
-    Handler mainHandler = null;
+    public Handler mainHandler = null;
+    
+    Ringtone r = null;
+    SharedPreferences sensiPref = null;
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         
 
-        
+		// Ring tone setup
+		Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+	    r = RingtoneManager.getRingtone(getApplicationContext(), notification);
+	    // Setup onPreferenceChanged listener for SettingsActivity
+	    sensiPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+	    sensiPref.registerOnSharedPreferenceChangeListener(this);
         // Spinner listing methods population
         method_spinner = (Spinner)findViewById(R.id.spinner_method);
         ArrayAdapter<String> methods = 
@@ -205,6 +221,7 @@ public class SensiLoc extends Activity {
 					// Get start battery level
 					IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
 					Intent battery = getApplicationContext().registerReceiver(null, ifilter);
+					startLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
 					int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
 					
 					Log.d(LOG_TAG, String.format("Battery level at start %d: %d", startLevel, scale));
@@ -215,6 +232,8 @@ public class SensiLoc extends Activity {
 			        if((method != null) && method.equals("Adaptive")) {
 			        	startService(sensiServiceIntent);
 			        	sensiServiceStarted = true;
+			        	// Trigger onSharedPreferenceChanged listener immediately with the preference's default value
+			        	onSharedPreferenceChanged(sensiPref, "manual_checkbox");
 			        }
 			        
 			        // Start timer
@@ -227,6 +246,7 @@ public class SensiLoc extends Activity {
 							// Get end battery level
 							IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
 							Intent battery = getApplicationContext().registerReceiver(null, ifilter);
+							endLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
 							int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
 							
 							Log.d(LOG_TAG, String.format("Battery level at end %d: %d ", endLevel, scale));
@@ -282,7 +302,43 @@ public class SensiLoc extends Activity {
 			}
         	
         });
+        // Turn Button
+        but_turn = (Button)findViewById(R.id.button_turn);
         
+        // Set turning button to invisible on initialization
+        but_turn.setVisibility(Button.INVISIBLE);
+        but_turn.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				 // Check manual options
+				 if(!sensiPref.getBoolean("manual_checkbox", true)) {
+					 return;
+				 }
+				// TODO Auto-generated method stub
+				// Notify locateService about the  direction changing event
+				Intent notifyLocateServiceIntent = new Intent(getApplicationContext(), LocateService.class);
+				
+				Bundle extras = new Bundle();	
+				extras.putInt(LocateService.KEY_MOVING_STATUS, LocateService.VAL_TURNING);
+				
+				notifyLocateServiceIntent.putExtras(extras);
+				startService(notifyLocateServiceIntent);
+				// Play notification
+				Toast.makeText(getApplicationContext(), "Change direction", Toast.LENGTH_SHORT).show();
+				
+				if(sensiPref.getBoolean("music_checkbox", true)) {
+					if(!r.isPlaying())
+						r.play();
+				} else {
+					Log.d(SensiLoc.LOG_TAG, "music checkbox shared preference returned false");
+				}
+				
+			}
+        	
+        });
+        
+        
+        // Handler for GUI updates
         mainHandler = new Handler() {
         	@Override
         	public void handleMessage(Message msg) {
@@ -297,7 +353,20 @@ public class SensiLoc extends Activity {
         	
         };
     }
-    
+    @Override
+	public void onSharedPreferenceChanged(SharedPreferences sharedPreferences,
+			String key) {
+		if(key.equals("manual_checkbox")) {
+			if(!sensiServiceStarted) return;
+			Boolean manualEnabled = sharedPreferences.getBoolean("manual_checkbox", false);
+			if(manualEnabled) {
+				but_turn.setVisibility(Button.VISIBLE);
+			} else {
+				but_turn.setVisibility(Button.INVISIBLE);
+			}
+		}
+		
+	}
     @Override
     public void onResume() 
     {
@@ -337,8 +406,12 @@ public class SensiLoc extends Activity {
 				startService(locateServiceIntent);
 				locateServiceStarted = true;
 				if((method != null) && method.equals("Adaptive")) {
+					
 					startService(sensiServiceIntent);
 					sensiServiceStarted = true;
+					// Trigger onSharedPreferenceChanged listener immediately with the preference's default value
+		        	onSharedPreferenceChanged(sensiPref, "manual_checkbox");
+					
 				}
 				
 				// Start timer
@@ -399,6 +472,10 @@ public class SensiLoc extends Activity {
     		stopService(locateServiceIntent);
     		locateServiceStarted = false;
     	}
+    	// remove shared preference value for manual checkbox
+    	if(sensiPref != null) {
+    		sensiPref.edit().clear().commit();
+    	}
     	super.onDestroy();
     }
     
@@ -413,11 +490,14 @@ public class SensiLoc extends Activity {
     public boolean onOptionsItemSelected(MenuItem item) {
     	switch(item.getItemId()) {
     	case R.id.menu_settings:
-    		startActivity(new Intent(this, SettingsActivity.class));
+    		Intent prefIntent = new Intent(this, SettingsActivity.class);
+    		startActivity(prefIntent);
     		break;
     	default:
     		return false;
     	}
     	return true;
     }
+
+	
 }

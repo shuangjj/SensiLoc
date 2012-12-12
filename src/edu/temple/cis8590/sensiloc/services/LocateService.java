@@ -14,12 +14,14 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Handler.Callback;
+import android.os.BatteryManager;
 import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
@@ -222,7 +224,7 @@ public class LocateService extends Service {
 				thread.start();
 				curMethod = LocateMethod.LOCATE_ADAPTIVE;
 			}
-			
+			// Create new record file and record start level
 			sdhelper.createFiles();
 		/*	Toast.makeText(this, "Locate service:\n\tUpdate frequency: " + utfreq
 					+ "\n\tmethod: " + method, Toast.LENGTH_SHORT).show();*/
@@ -356,10 +358,20 @@ public class LocateService extends Service {
 						(curMethod == LocateMethod.LOCATE_NETWORK) ? "/Network_Record.txt" : "/Adapt_Record.txt") );
 					
 					if(fp.exists()) {
+						// Delete existing file
 						fp.delete();
 					}
 					try {
 						fp.createNewFile();
+						// Record start battery level
+						IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+						Intent battery = getApplicationContext().registerReceiver(null, ifilter);
+						int startLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+						int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+						FileWriter fw = new FileWriter(fp, true);
+						fw.append(String.format("Battery Level: %d: %d\n", startLevel, scale));
+						fw.flush();
+						
 					}catch(IOException e) {
 						Log.e(LOG_TAG, "Error creating files under "+sensiDir.getPath(), e);
 						return false;
@@ -408,7 +420,7 @@ public class LocateService extends Service {
 			}
 			// Writing records
 			if(fp.exists() && fp.canWrite()) {
-				FileOutputStream fos = null;
+				//FileOutputStream fos = null;
 				FileWriter fw = null;
 				BufferedWriter bw = null;
 				try {
@@ -456,6 +468,18 @@ public class LocateService extends Service {
 		 * Quit handler
 		 */
 		public void stopHandler() {
+			// Record stop battery level
+			IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+			Intent battery = getApplicationContext().registerReceiver(null, ifilter);
+			int stoptLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+			int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+			try {
+				FileWriter fw = new FileWriter(fp, true);
+				fw.append(String.format("Battery Level: %d: %d\n", stoptLevel, scale));
+				fw.flush();
+			} catch(IOException e) {
+				Log.e(SensiLoc.LOG_TAG, "Exception while writing stop battery level", e);
+			}
 			t.quit();
 		}
 	}

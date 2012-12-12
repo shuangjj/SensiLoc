@@ -39,7 +39,7 @@ public class SensiService extends Service implements SensorEventListener{
     private final float rad2deg = 180/(float)Math.PI;
     private int THRESHOLD = 90;
     int ANGLE_FILTER_HIGH = 250;
-    int ANGLE_FILTER_LOW = 3;
+    int ANGLE_FILTER_LOW = 5;
     int turn_angle = 0;
     int angleDelta = 0;
     
@@ -135,6 +135,9 @@ public class SensiService extends Service implements SensorEventListener{
 				angleDelta += delta;
 				if(Math.abs(angleDelta)>turn_angle) {
 					angleDelta = 0;
+					if(musicPref.getBoolean("manual_checkbox", true)) {
+						 return;
+					}
 					// Notify locateService about the  direction changing event
 					Intent notifyLocateServiceIntent = new Intent(this, LocateService.class);
 					
@@ -148,6 +151,8 @@ public class SensiService extends Service implements SensorEventListener{
 					if(musicPref.getBoolean("music_checkbox", true)) {
 						if(!r.isPlaying())
 							r.play();
+					} else {
+						Log.d(SensiLoc.LOG_TAG, "music checkbox shared preference returned false");
 					}
 				    
 				}
