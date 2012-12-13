@@ -2,19 +2,25 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
     <!-- turning delay -->
     <EditTextPreference
+        android:key="pref_turn_delay"
         android:defaultValue="@string/pref_default_turn_delay"
         android:inputType="number"
-        android:key="pref_turn_delay"
         android:selectAllOnFocus="true"
         android:title="@string/pref_title_turn_delay" />
     <!-- turning angle -->
 	<ListPreference
+	    android:key="pref_turn_angle_list"
         android:defaultValue="90"
         android:entries="@array/pref_turn_angle_list_titles"
         android:entryValues="@array/pref_turn_angle_list_values"
-        android:key="pref_turn_angle_list"
         android:negativeButtonText="@null"
         android:positiveButtonText="@null"
         android:title="@string/pref_turn_angle_title" />
-	
+	<!-- Turn audio notification -->
+	<CheckBoxPreference
+        android:defaultValue="true"
+        android:key="music_checkbox"
+        android:summary="@string/pref_description_music_enable"
+        android:title="@string/pref_title_music_enable" />
+
 </PreferenceScreen>

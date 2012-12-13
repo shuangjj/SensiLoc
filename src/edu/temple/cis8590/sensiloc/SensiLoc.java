@@ -88,10 +88,18 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
 		// Ring tone setup
 		Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
 	    r = RingtoneManager.getRingtone(getApplicationContext(), notification);
+	   	
+	    
+	    
+	    Intent prefIntent = new Intent(this, SettingsActivity.class);
+		startActivity(prefIntent);
 	    // Setup onPreferenceChanged listener for SettingsActivity
 	    sensiPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
 	    sensiPref.registerOnSharedPreferenceChangeListener(this);
-        // Spinner listing methods population
+	    // Popup setup
+    	
+	    
+       /* // Spinner listing methods population
         method_spinner = (Spinner)findViewById(R.id.spinner_method);
         ArrayAdapter<String> methods = 
         		new ArrayAdapter(this, android.R.layout.simple_spinner_item, this.getResources().getStringArray(R.array.method));
@@ -110,13 +118,13 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
         		new ArrayAdapter(this, android.R.layout.simple_spinner_item, 
         				this.getResources().getStringArray(R.array.turning_angles));
         angles.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinner_turning_angle.setAdapter(angles);
+        spinner_turning_angle.setAdapter(angles);*/
         // Start button
         Button but_start = (Button)findViewById(R.id.button_start);
         but_start.setOnClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				// Experiment time
+/*				// Experiment time
 				if( (et_time !=null) && !et_time.getText().toString().trim().equals("")) {
 					exper_time = Integer.valueOf(et_time.getText().toString().trim()).longValue();
 				} else {
@@ -154,7 +162,26 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
 						// TODO: AlartDialog prompt user set frequency
 						return;
 					}
-				}
+				}*/
+				// General Preferences
+				Boolean manul_enabled = sensiPref.getBoolean("pref_manual_turn", false);
+				// Experiment Preferences
+				exper_time = Integer.parseInt(sensiPref.getString("pref_exper_time", "0"));
+				int utfreq = Integer.parseInt( sensiPref.getString("pref_update_freq", "0") );
+				int rdfreq = Integer.parseInt( sensiPref.getString("pref_record_freq", "0") );
+				method = sensiPref.getString("pref_list_methods", "GPS");
+				// Adaptive Preferences
+				int turn_delay = Integer.parseInt( sensiPref.getString("pref_turn_delay", "0") );
+				int turn_angle = Integer.parseInt( sensiPref.getString("pref_turn_angle_list", "0") );
+				
+				Boolean music_enabled = sensiPref.getBoolean("music_checkbox", true);
+				Log.d(LOG_TAG, String.format("exper_time: %d\nupdate frequencty: %d\n" +
+						"record frequency: %d\nmethod: %s\nturn delay: %d\nturn angle: %d\n" +
+						"manual_checkbox: %s\nmusic_checkbox: %s",  
+						exper_time, utfreq, rdfreq, method, turn_delay, turn_angle, manul_enabled.toString(),
+						music_enabled.toString()));
+				
+				
 				/* Add extras and start location record service */
 				locateServiceIntent = new Intent(v.getContext(), LocateService.class);
 				Bundle locateBundle = new Bundle();
@@ -166,6 +193,7 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
 				}
 				locateBundle.putString(KEY_METHOD, method);
 				locateServiceIntent.putExtras(locateBundle);
+				
 				/* sensiService */
 				sensiServiceIntent = new Intent(v.getContext(), SensiService.class);
 				Bundle sensiBundle = new Bundle();
@@ -233,7 +261,7 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
 			        	startService(sensiServiceIntent);
 			        	sensiServiceStarted = true;
 			        	// Trigger onSharedPreferenceChanged listener immediately with the preference's default value
-			        	onSharedPreferenceChanged(sensiPref, "manual_checkbox");
+			        	onSharedPreferenceChanged(sensiPref, "pref_manual_turn");
 			        }
 			        
 			        // Start timer
@@ -337,7 +365,7 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
         	
         });
         
-        
+        tv_result = (TextView)findViewById(R.id.textView_result);
         // Handler for GUI updates
         mainHandler = new Handler() {
         	@Override
@@ -356,9 +384,10 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
     @Override
 	public void onSharedPreferenceChanged(SharedPreferences sharedPreferences,
 			String key) {
-		if(key.equals("manual_checkbox")) {
+    	
+		if(key.equals("pref_manual_turn")) {
 			if(!sensiServiceStarted) return;
-			Boolean manualEnabled = sharedPreferences.getBoolean("manual_checkbox", false);
+			Boolean manualEnabled = sharedPreferences.getBoolean("pref_manual_turn", false);
 			if(manualEnabled) {
 				but_turn.setVisibility(Button.VISIBLE);
 			} else {
@@ -373,6 +402,7 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
     	Log.d(LOG_TAG, "SensiLoc activity resumed");
     	// After start LOCATION_SOURCE_SETTING activity, restart sensiService
     	//startService(sensiServiceIntent);
+
     	super.onResume();
     }
     @Override

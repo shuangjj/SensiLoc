@@ -1,0 +1,34 @@
+<!-- <?xml version="1.0" encoding="utf-8"?> -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
+    <!-- Experiment time -->
+    <EditTextPreference
+        android:defaultValue="@string/pref_default_exper_time"
+        android:key="pref_exper_time"
+        android:inputType="number"
+        android:selectAllOnFocus="true"
+        android:title="@string/pref_title_exper_time" />
+	<!-- Update frequency -->
+    <EditTextPreference
+        android:key="pref_update_freq"
+        android:defaultValue="@string/pref_default_update_freq"
+        android:inputType="number"
+        android:selectAllOnFocus="true"
+        android:title="@string/pref_title_update_freq" />
+    <!-- Record frequency -->
+    <EditTextPreference
+        android:key="pref_record_freq"
+        android:defaultValue="@string/pref_default_record_freq"
+        android:inputType="number"
+        android:selectAllOnFocus="true"
+        android:title="@string/pref_title_record_freq" />
+    <!-- Methods to locate -->
+    <ListPreference
+	    android:key="pref_list_methods"
+        android:defaultValue="GPS"
+        android:entries="@array/pref_list_titles_methods"
+        android:entryValues="@array/pref_list_values_methods"
+        android:negativeButtonText="@null"
+        android:positiveButtonText="@null"
+        android:title="@string/pref_title_methods" />
+	<!-- Turn audio notification -->
+</PreferenceScreen>

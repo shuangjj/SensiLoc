@@ -99,11 +99,23 @@ public class SettingsActivity extends PreferenceActivity implements OnPreference
 
 		// In the simplified UI, fragments are not used at all and we instead
 		// use the older PreferenceActivity APIs.
-
-		// Add 'general' preferences.
-		addPreferencesFromResource(R.xml.pref_general);
-		// Add 'adaptive' preference, and corresponding header.
+		addPreferencesFromResource(R.xml.pref_empty);
+		// Add 'general' preferences, and corresponding header.
 		PreferenceCategory fakeHeader = new PreferenceCategory(this);
+		fakeHeader.setTitle(R.string.pref_header_title_general);
+		getPreferenceScreen().addPreference(fakeHeader);
+		
+		addPreferencesFromResource(R.xml.pref_general);
+		
+		// Add 'exper_param' preference, and corresponding header.
+		fakeHeader = new PreferenceCategory(this);
+		fakeHeader.setTitle(R.string.pref_header_exper_param);
+		getPreferenceScreen().addPreference(fakeHeader);
+		
+		addPreferencesFromResource(R.xml.pref_exper_param);
+		
+		// Add 'adaptive' preference, and corresponding header.
+		fakeHeader = new PreferenceCategory(this);
 		fakeHeader.setTitle(R.string.pref_header_adaptive);
 		getPreferenceScreen().addPreference(fakeHeader);
 		
@@ -124,7 +136,17 @@ public class SettingsActivity extends PreferenceActivity implements OnPreference
 		// their values. When their values change, their summaries are updated
 		// to reflect the new value, per the Android Design guidelines.
 		bindPreferenceSummaryToValue(findPreference("music_checkbox"));
-		bindPreferenceSummaryToValue(findPreference("manual_checkbox"));
+		bindPreferenceSummaryToValue(findPreference("pref_manual_turn"));
+		
+		bindPreferenceSummaryToValue(findPreference("pref_exper_time"));
+		bindPreferenceSummaryToValue(findPreference("pref_update_freq"));
+		bindPreferenceSummaryToValue(findPreference("pref_record_freq"));
+		bindPreferenceSummaryToValue(findPreference("pref_list_methods"));
+		
+		bindPreferenceSummaryToValue(findPreference("pref_turn_delay"));
+		bindPreferenceSummaryToValue(findPreference("pref_turn_angle_list"));
+		
+		//bindPreferenceSummaryToValue();
 /*		bindPreferenceSummaryToValue(findPreference("example_list"));
 		bindPreferenceSummaryToValue(findPreference("notifications_new_message_ringtone"));
 		bindPreferenceSummaryToValue(findPreference("sync_frequency"));*/
@@ -297,14 +319,39 @@ public class SettingsActivity extends PreferenceActivity implements OnPreference
 				preference,
 				PreferenceManager.getDefaultSharedPreferences(
 						preference.getContext()).getBoolean("music_checkbox", true));*/
-		onPreferenceChange(
-				preference,
-				PreferenceManager.getDefaultSharedPreferences(
-						preference.getContext()).getBoolean("music_checkbox", true));
-		onPreferenceChange(
-				preference,
-				PreferenceManager.getDefaultSharedPreferences(
-						preference.getContext()).getBoolean("manual_checkbox", false));
+		String perferenceKey = preference.getKey();
+		if(perferenceKey.equals("music_checkbox")) {
+			onPreferenceChange( preference, PreferenceManager.getDefaultSharedPreferences(
+							preference.getContext()).getBoolean("music_checkbox", true));
+			
+		} else if(perferenceKey.equals("pref_manual_turn")) {
+			onPreferenceChange( preference, PreferenceManager.getDefaultSharedPreferences(
+					preference.getContext()).getBoolean("pref_manual_turn", false) );
+			
+		} else if(perferenceKey.equals("pref_turn_delay")) {
+			onPreferenceChange(preference, PreferenceManager.getDefaultSharedPreferences(
+					preference.getContext()).getString("pref_turn_delay", "0"));
+			
+		} else if(perferenceKey.equals("pref_turn_angle_list")) {
+			onPreferenceChange(preference, PreferenceManager.getDefaultSharedPreferences(
+					preference.getContext()).getString("pref_turn_angle_list", "90"));
+			
+		}else if(perferenceKey.equals("pref_exper_time")) {
+			onPreferenceChange(preference, PreferenceManager.getDefaultSharedPreferences(
+					preference.getContext()).getString("pref_exper_time", "0"));
+			
+		}else if(perferenceKey.equals("pref_update_freq")) {
+			onPreferenceChange(preference, PreferenceManager.getDefaultSharedPreferences(
+					preference.getContext()).getString("pref_update_freq", "0"));
+			
+		}else if(perferenceKey.equals("pref_record_freq")) {
+			onPreferenceChange(preference, PreferenceManager.getDefaultSharedPreferences(
+					preference.getContext()).getString("pref_record_freq", "0"));
+			
+		}else if(perferenceKey.equals("pref_list_methods")) {
+			onPreferenceChange(preference, PreferenceManager.getDefaultSharedPreferences(
+					preference.getContext()).getString("pref_list_methods", "GPS"));
+		}
 	}
 	/**
 	 * This fragment shows general preferences only. It is used when the

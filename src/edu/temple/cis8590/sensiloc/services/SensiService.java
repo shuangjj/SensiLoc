@@ -72,6 +72,7 @@ public class SensiService extends Service implements SensorEventListener{
 		turn_angle = bundle.getInt(SensiLoc.KEY_TURN_ANGLE);
 		Log.d(SensiLoc.LOG_TAG, "Set turn_angle from SensiLoc to " + turn_angle);
 		
+		
 		if( (mAcceler != null) && (mMagnetic != null) ){
         	
         	sm.registerListener(this, mAcceler, SensorManager.SENSOR_DELAY_NORMAL);
@@ -135,9 +136,12 @@ public class SensiService extends Service implements SensorEventListener{
 				angleDelta += delta;
 				if(Math.abs(angleDelta)>turn_angle) {
 					angleDelta = 0;
-					if(musicPref.getBoolean("manual_checkbox", true)) {
+					
+					if(musicPref.getBoolean("pref_manual_turn", true)) {
+						Log.d(SensiLoc.LOG_TAG, "manual_checkbox returned true");
 						 return;
 					}
+					Log.d(SensiLoc.LOG_TAG, "manual_checkbox returned false");
 					// Notify locateService about the  direction changing event
 					Intent notifyLocateServiceIntent = new Intent(this, LocateService.class);
 					

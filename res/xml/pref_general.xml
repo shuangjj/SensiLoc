@@ -1,15 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
 
-    <CheckBoxPreference
-        android:defaultValue="true"
-        android:key="music_checkbox"
-        android:summary="@string/pref_description_music_enable"
-        android:title="@string/pref_title_music_enable" />
+
 	<CheckBoxPreference
-        android:defaultValue="false"
-        android:key="manual_checkbox"
+        android:defaultValue="true"
+        android:key="pref_manual_turn"
         android:summary="@string/pref_description_manual_enable"
         android:title="@string/pref_title_manual_enable" />
+	
     <!-- NOTE: EditTextPreference accepts EditText attributes. -->
     <!-- NOTE: EditTextPreference's summary should be set to its value by the activity code. -->
 <!--     <EditTextPreference
@@ -27,13 +25,13 @@
          dismiss it.
     -->
     <!-- NOTE: ListPreference's summary should be set to its value by the activity code. -->
-    <ListPreference
+<!--     <ListPreference
         android:defaultValue="-1"
         android:entries="@array/pref_example_list_titles"
         android:entryValues="@array/pref_example_list_values"
         android:key="example_list"
         android:negativeButtonText="@null"
         android:positiveButtonText="@null"
-        android:title="@string/pref_title_add_friends_to_messages" />
+        android:title="@string/pref_title_add_friends_to_messages" /> -->
 
 </PreferenceScreen>
