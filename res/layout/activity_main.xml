@@ -20,12 +20,50 @@
 	        android:inputType="textMultiLine"
 	        android:textAppearance="?android:attr/textAppearanceMedium" />
 	</LinearLayout>
+	<!-- Experiment feedback  -->
+	<LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:layout_marginLeft="5dp"
+        android:orientation="horizontal">
+	    <TextView
+	        android:id="@+id/textView_success"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="Success "
+	        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+	    <EditText
+	        android:id="@+id/editText_success"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:enabled="false"
+	        android:inputType="none"
+	        android:text="000" />
+	    <!-- Failure number -->
+	    <TextView
+	        android:id="@+id/textView_fail"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:layout_marginLeft="50dp"
+	        android:text="Fail "
+	        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+	    <EditText
+	        android:id="@+id/editText_fail"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:enabled="false"
+	        android:inputType="none"
+	        android:text="000" />
+	</LinearLayout>
 	
 	<!-- Start & Stop -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="5dp"
         android:layout_marginLeft="5dp"
         android:orientation="horizontal">
         <Button
@@ -45,12 +83,20 @@
     </LinearLayout>
    
    
-	<!-- Show result -->
+	<!-- Running status -->
  	<LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
-        android:orientation="horizontal">
+        android:layout_marginTop="10dp"
+        android:orientation="vertical">
+        <TextView
+	        android:id="@+id/textView_status"
+	        android:layout_width="match_parent"
+	        android:layout_height="wrap_content"
+	        android:layout_marginLeft="5dp"
+	        android:text="Running Status:"
+	        android:textColor="@color/blue"
+	        android:textAppearance="?android:attr/textAppearanceMedium" />
 	    <TextView
 	        android:id="@+id/textView_result"
 	        android:layout_width="match_parent"

@@ -15,6 +15,8 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -26,6 +28,7 @@ import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.util.Log;
 import android.widget.Toast;
@@ -165,7 +168,7 @@ public class LocateService extends Service {
 	public void onCreate() {
 		
 		//
-		sdhelper = new SDRecordHelper();
+		
 		
 		// Location Manager
 		lm = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
@@ -230,6 +233,7 @@ public class LocateService extends Service {
 				curMethod = LocateMethod.LOCATE_ADAPTIVE;
 			}
 			// Create new record file and record start level
+			sdhelper = new SDRecordHelper();
 			sdhelper.createFiles(filename);
 		/*	Toast.makeText(this, "Locate service:\n\tUpdate frequency: " + utfreq
 					+ "\n\tmethod: " + method, Toast.LENGTH_SHORT).show();*/
@@ -330,12 +334,24 @@ public class LocateService extends Service {
 	class SDRecordHelper  implements Callback {
 		
 		File fp = null;
+		FileWriter fw = null;
 		
 		HandlerThread t;
 		Handler handler;
+		
+		int success;
+		int fail;
+		static final String pref_success_key = "pref_success";
+		static final String pref_fail_key = "pref_fail";
 		static final String SD_DIR = "/sdcard/sensiloc/";
+		SharedPreferences pref = null;
+		
 		public SDRecordHelper() {
-			
+			// Initialize shared preference
+			pref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+			Editor e = pref.edit().putInt(pref_success_key, 0);
+			e.putInt(pref_fail_key, 0);
+			e.commit();
 			// Initialize HandlerThread
 			t = new HandlerThread("Location Record");
 			t.start();
@@ -376,7 +392,7 @@ public class LocateService extends Service {
 						Intent battery = getApplicationContext().registerReceiver(null, ifilter);
 						int startLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
 						int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-						FileWriter fw = new FileWriter(fp, true);
+						fw = new FileWriter(fp, true);
 						fw.append(String.format("Battery Level: %d: %d\n", startLevel, scale));
 						fw.flush();
 						
@@ -426,34 +442,33 @@ public class LocateService extends Service {
 			buf.append(record.curBatteryLevel);		// battery level
 			buf.append("\n");
 		
-			if(fp == null) {
+			
+/*			if(fp == null) {
 				fp = new File(SDRecordHelper.SD_DIR+((curMethod == LocateMethod.LOCATE_GPS) ? "/GPS_Record.txt" :
 					(curMethod == LocateMethod.LOCATE_NETWORK) ? "/Network_Record.txt" : "/Adapt_Record.txt") );
+			}*/
+			// Update display by shared preference
+			if(record.providerAvailable) {
+				
+				pref.edit().putInt(pref_success_key, pref.getInt(pref_success_key, -100) + 1 ).commit();
+				Log.d(SensiLoc.LOG_TAG, "put success " + pref.getInt(pref_success_key, -100));
+			} else {
+				pref.edit().putInt(pref_fail_key, pref.getInt(pref_fail_key, -100) + 1 ).commit();
+				Log.d(SensiLoc.LOG_TAG, "put fail " + pref.getInt(pref_fail_key, -100));
 			}
+			
 			// Writing records
-			if(fp.exists() && fp.canWrite()) {
+			if(fp.exists() && fp.canWrite() && (fw != null)) {
 				//FileOutputStream fos = null;
-				FileWriter fw = null;
-				BufferedWriter bw = null;
+				
+				//BufferedWriter bw = null;
 				try {
-					fw = new FileWriter(fp, true);
-					bw = new BufferedWriter(fw);
-					bw.write(buf.toString());
-					
+					//fw = new FileWriter(fp, true);
+					fw.write(buf.toString());
+					fw.flush();
 				} catch (IOException e) {
 					Log.e(SensiLoc.LOG_TAG, "Error writing ...", e);
 					return false;
-				} finally {
-					if(bw != null) {
-						try {
-							bw.close();
-							fw.close();
-						} catch(IOException e) {
-							// TODO: swallow
-						}
-					}
-
-					
 				}
 				
 			}else { // gpsFp.exists()
@@ -486,9 +501,11 @@ public class LocateService extends Service {
 			int stoptLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
 			int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
 			try {
-				FileWriter fw = new FileWriter(fp, true);
-				fw.append(String.format("Battery Level: %d: %d\n", stoptLevel, scale));
-				fw.flush();
+				if(fw != null) {
+					fw.append(String.format("Battery Level: %d: %d\n", stoptLevel, scale));
+					fw.flush();
+					fw.close();
+				}
 			} catch(IOException e) {
 				Log.e(SensiLoc.LOG_TAG, "Exception while writing stop battery level", e);
 			}

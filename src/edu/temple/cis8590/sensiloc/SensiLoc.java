@@ -1,6 +1,7 @@
 package edu.temple.cis8590.sensiloc;
 
 
+import java.sql.Timestamp;
 import java.util.Timer;
 
 import java.util.TimerTask;
@@ -25,6 +26,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
+import android.text.Html;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -63,6 +65,8 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
     Spinner method_spinner;
     Spinner spinner_turning_angle;*/
     TextView tv_exper_info;
+    EditText et_success;
+    EditText et_fail;
     Button but_turn;
     TextView tv_result;
     
@@ -127,6 +131,13 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
         spinner_turning_angle.setAdapter(angles);*/
 	    
 	    tv_exper_info = (TextView)findViewById(R.id.textView_exper_info);
+	    //
+	    TextView tv_success = (TextView)findViewById(R.id.textView_success);
+	    tv_success.setText(Html.fromHtml("<font color='blue'>" + tv_success.getText() + "<font>"));
+	    TextView tv_fail = (TextView)findViewById(R.id.textView_fail);
+	    tv_fail.setText(Html.fromHtml("<font color='blue'>" + tv_fail.getText() + "<font>"));
+	    et_success = (EditText)findViewById(R.id.editText_success);
+	    et_fail = (EditText)findViewById(R.id.editText_fail);
         // Start button
         Button but_start = (Button)findViewById(R.id.button_start);
         but_start.setOnClickListener(new OnClickListener() {
@@ -334,7 +345,8 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
         	public void handleMessage(Message msg) {
         		switch(msg.what) {
         		case 0:
-        			tv_result.setText("Test over, battery level used " + (startLevel - endLevel));
+        			tv_result.append("\tFinished at " + new Timestamp(System.currentTimeMillis()).toString() + "\n" ) ;
+        			tv_result.append("\tBattery level: " + endLevel);
         			break;
         		default:
         			;
@@ -356,6 +368,11 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
 			} else {
 				but_turn.setVisibility(Button.INVISIBLE);
 			}
+		} else if(key.equals("pref_success")) {
+			et_success.setText( String.format("%03d", sharedPreferences.getInt("pref_success", -100)) );
+
+		} else if(key.equals("pref_fail")) {
+			et_fail.setText( String.format("%03d", sharedPreferences.getInt("pref_fail", -100)) );
 		}
 		
 	}
@@ -388,38 +405,43 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
 			@Override
 			public void run() {
 				Looper.prepare();
-				// Get end battery level
-				IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-				Intent battery = getApplicationContext().registerReceiver(null, ifilter);
-				endLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-				int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
 				
-				Log.d(LOG_TAG, String.format("Battery level at end %d: %d ", endLevel, scale));
-				
-				//  Stop all running services
-				if(locateServiceStarted) {
-		    		stopService(locateServiceIntent);	
-		    		locateServiceStarted = false;
-		    	}
-			  	if(sensiServiceStarted) {
-			  		stopService(sensiServiceIntent);
-			  		sensiServiceStarted = false;
-			  	}
-			  	// Update message by handler
-			  	if(mainHandler != null) {
-			  		mainHandler.sendEmptyMessage(0);
-			  	}
-			  	// 
-				Toast.makeText(getApplicationContext(), "Test over, used battery level "
-						+ (startLevel-endLevel), Toast.LENGTH_LONG).show();
-				
+				stopExperiment();
 				Looper.loop();
 				
 			}
         	
         }, exper_time*60*1000);
         
-        tv_result.setText("Running...");
+        tv_result.setText("\tStarted at " + new Timestamp(System.currentTimeMillis()).toString() + "\n"  );
+        tv_result.append("\tBattery level: " + startLevel + "\n");
+    }
+    private void stopExperiment() 
+    {
+    	// Get end battery level
+		IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+		Intent battery = getApplicationContext().registerReceiver(null, ifilter);
+		endLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+		int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+		
+		Log.d(LOG_TAG, String.format("Battery level at end %d: %d ", endLevel, scale));
+		
+		//  Stop all running services
+		if(locateServiceStarted) {
+    		stopService(locateServiceIntent);	
+    		locateServiceStarted = false;
+    	}
+	  	if(sensiServiceStarted) {
+	  		stopService(sensiServiceIntent);
+	  		sensiServiceStarted = false;
+	  	}
+	  	// Update message by handler
+	  	if(mainHandler != null) {
+	  		mainHandler.sendEmptyMessage(0);
+	  	}
+	  	// 
+		/*Toast.makeText(getApplicationContext(), "Test over, used battery level "
+				+ (startLevel-endLevel), Toast.LENGTH_LONG).show();*/
     }
     @Override
     public void onResume() 
@@ -473,13 +495,25 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
 				int turn_angle = Integer.parseInt( sensiPref.getString("pref_turn_angle_list", "0") );
 				
 				Boolean music_enabled = sensiPref.getBoolean("music_checkbox", true);
-				
+				String html = null;
 				// Update display info
-				tv_exper_info.setText("---- Experiment Parameters -----\n");
-				tv_exper_info.append( String.format("\t%-37s\t%-10s\n", "[Time]", (exper_time+" min").trim()) );
-				tv_exper_info.append( String.format("\t%-35s\t%-10s\n", "[Method]", method) );
-				tv_exper_info.append( String.format("\t%-33s\t%-10s\n", "[Frequency]", (utfreq+" sec").trim()) );
-				tv_exper_info.append( String.format("\t%-35s\t%-10s\n", "[Manual]", manul_enabled.toString()) );
+				tv_exper_info.setText(Html.fromHtml("<font size='7' color='blue'>Experiment Parameters</font><br >"));
+				tv_exper_info.append( String.format("\t%-24s\t%s\n", "[Time]", (exper_time+" min").trim()));  // Experiment time
+				html = "<font color='grey'>" 
+						+ String.format("\t%-24s\t%s", "[File name]", record_filename) 			// record file name
+						+ "</font><br >";
+				tv_exper_info.append( Html.fromHtml(html) );
+				tv_exper_info.append( String.format("\t%-24s\t%s\n", "[Method]", method) );		// method
+				tv_exper_info.append( Html.fromHtml("<font color='grey'>" 
+						+ String.format("\t%-24s\t%s", "[Frequency]", (utfreq+" sec").trim())	// update frequency
+						+ "</font> <br >") );
+				//tv_exper_info.append("\n");
+				tv_exper_info.append( String.format("\t%-24s\t%s\n", "[Manual]", manul_enabled.toString()) );	// manually turn
+				tv_exper_info.append( Html.fromHtml("<font color='grey'>"
+						+ String.format("\t%-24s\t%d sec", "[Turn delay]", turn_delay)			// turn delay
+						+ "</font> <br >") );				
+				tv_exper_info.append( String.format("\t%-24s\t%d", "[Turn angle]", turn_angle) );				// turn angle
+				
         	}
         }
     	
