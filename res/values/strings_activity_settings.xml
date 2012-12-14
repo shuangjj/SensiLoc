@@ -9,16 +9,19 @@
 	<string name="pref_title_manual_enable">Enable manual turning</string>
 	<string name="pref_description_manual_enable">Turn by pressing the turn button</string>
 	
+	<!-- Filename -->
+	<string name="pref_title_filename">Record filename</string>
+	<string name="pref_default_filename">Default</string>
 	<!-- ****************Experiment parameters**************** -->
 	<string name="pref_header_exper_param">Experiment parameters</string>
 	<!-- Experiment time -->
-	<string name="pref_title_exper_time">Experiment time</string>
+	<string name="pref_title_exper_time">Experiment time [Min]</string>
 	<string name="pref_default_exper_time">2</string>
 	<!-- Location update frequency -->
-	<string name="pref_title_update_freq">Update frequency</string>
+	<string name="pref_title_update_freq">Update frequency [Sec]</string>
 	<string name="pref_default_update_freq">20</string>
 	<!-- Location record frequency -->
-	<string name="pref_title_record_freq">Record frequency</string>
+	<string name="pref_title_record_freq">Record frequency [Sec]</string>
 	<string name="pref_default_record_freq">20</string>
 	<!-- Methods -->
 	<string name="pref_title_methods">Methods</string>
@@ -36,7 +39,7 @@
 	<string name="pref_header_adaptive">Adaptive</string>
 	<!-- turning delay -->
 	<string name="pref_default_turn_delay">60</string>
-	<string name="pref_title_turn_delay">Turn delay</string>
+	<string name="pref_title_turn_delay">Turn delay [Sec]</string>
 	
 	<!-- turning angle -->
 	<string name="pref_turn_angle_title">Turn angle</string>

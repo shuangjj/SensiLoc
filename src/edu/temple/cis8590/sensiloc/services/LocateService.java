@@ -115,14 +115,21 @@ public class LocateService extends Service {
 		public void run() {
 			Location location = null;
 			MyLocationRecord  record = new MyLocationRecord();
+			
+			// Record time stamp
+			Timestamp ts = new Timestamp(System.currentTimeMillis());
+			record.timestamp = ts.toString();
+			// Location provider
+			record.provider = (!method.equals("Adaptive")) ? method : (curStatus == MovingStatus.STRAIGHT) ? "Network" : 
+				"GPS";
+			// Current battery level
+			IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+			Intent battery = getApplicationContext().registerReceiver(null, ifilter);
+			int level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+			record.curBatteryLevel = level;
+			// Get location object
 			if(method.equals("GPS")) {
-				//Intent gpsUpdateIntent = new Intent();
-				//final PendingIntent launchIntent = PendingIntent.getBroadcast(LocateService.this, 5000, gpsUpdateIntent, 0);
-				//lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, );
-				//lm.requestSingleUpdate(LocationManager.GPS_PROVIDER, listener, );
-
 				location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-				
 				
 			} else if(method.equals("Network")) {
 				location = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
@@ -131,29 +138,24 @@ public class LocateService extends Service {
 				// Get location based on the current moving status
 				if(curStatus == MovingStatus.STRAIGHT) {
 					location = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+					
 				} else if(curStatus == MovingStatus.TURNING) {
 					location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
 				}
 				
 			}
-			// Send request to handler for location record
 			if(location != null) {
-				
-				Timestamp ts = new Timestamp(System.currentTimeMillis());
-				record.timestamp = ts.toString();
-				record.location = location;
-				record.provider = (!method.equals("Adaptive")) ? method : (curStatus == MovingStatus.STRAIGHT) ? "Network" : 
-					"GPS";
-				Message msg = new Message();
-				msg.what = 0;
-				
-				msg.obj = (Object)record;
-				sdhelper.handler.sendMessage(msg);
-				
+				record.providerAvailable = true;
+				record.location = location;	
 			} else {
-				
+				record.providerAvailable = false;
+				Log.d(SensiLoc.LOG_TAG, "getLastKnownLocation return null");
 			}
-			
+			// Send request to handler for location record
+			Message msg = new Message();
+			msg.what = 0;
+			msg.obj = (Object)record;
+			sdhelper.handler.sendMessage(msg);
 		}
 	};
 	/*
@@ -196,6 +198,9 @@ public class LocateService extends Service {
 			utfreq = bundle.getInt(SensiLoc.KEY_UTFREQ);
 			rdfreq = bundle.getInt(SensiLoc.KEY_RDFREQ);
 			method = bundle.getString(SensiLoc.KEY_METHOD);
+			String filename = bundle.getString(SensiLoc.KEY_RECORD_FILE);
+			Log.d(SensiLoc.LOG_TAG, "LocateService get filename " + filename);
+			
 			if(method.equals("Adaptive")) {
 				turn_delay = bundle.getInt(SensiLoc.KEY_TURN_DELAY);
 			}
@@ -225,7 +230,7 @@ public class LocateService extends Service {
 				curMethod = LocateMethod.LOCATE_ADAPTIVE;
 			}
 			// Create new record file and record start level
-			sdhelper.createFiles();
+			sdhelper.createFiles(filename);
 		/*	Toast.makeText(this, "Locate service:\n\tUpdate frequency: " + utfreq
 					+ "\n\tmethod: " + method, Toast.LENGTH_SHORT).show();*/
 			
@@ -233,7 +238,8 @@ public class LocateService extends Service {
 			if(locateTimer==null) {
 				
 				locateTimer = new Timer();
-				locateTimer.schedule(locateTask, rdfreq*1000, rdfreq*1000);
+				locateTimer.schedule(locateTask, (utfreq+1)*1000, rdfreq*1000);
+				//locateTimer.schedule(locateTask, 0, rdfreq*1000);
 			}
 		} else {
 			// Intent from SensiService
@@ -282,7 +288,6 @@ public class LocateService extends Service {
 					switch(msg.what) {
 					case MSG_QUIT:
 						Looper.myLooper().quit();
-						Log.i(LOG_TAG, "Looper quit()");
 						break;
 					case MSG_GPS:
 						lm.removeUpdates(listener);
@@ -311,6 +316,9 @@ public class LocateService extends Service {
 		public Location location;
 		public String where;
 		public String timestamp;
+		public int curBatteryLevel;
+		public boolean providerAvailable;
+		//public String update_timestamp;
 		public MyLocationRecord() {
 			
 		}
@@ -338,7 +346,7 @@ public class LocateService extends Service {
 		/*
 		 * Create record files on SD card
 		 */
-		public boolean createFiles() {
+		public boolean createFiles(String filename) {
 			// Create files in SD card for location recording
 			File sdDir = new File("/sdcard/");
 			if(sdDir.exists() && sdDir.canWrite()) {
@@ -354,9 +362,9 @@ public class LocateService extends Service {
 				// Create files and assign corresponding file handler
 				if(sensiDir.exists() && sensiDir.canWrite()) {
 					
-					fp = new File(sensiDir.getAbsoluteFile()+((curMethod == LocateMethod.LOCATE_GPS) ? "/GPS_Record.txt" :
-						(curMethod == LocateMethod.LOCATE_NETWORK) ? "/Network_Record.txt" : "/Adapt_Record.txt") );
-					
+				/*	fp = new File(sensiDir.getAbsoluteFile()+((curMethod == LocateMethod.LOCATE_GPS) ? "/GPS_Record.txt" :
+						(curMethod == LocateMethod.LOCATE_NETWORK) ? "/Network_Record.txt" : "/Adapt_Record.txt") );*/
+					fp = new File(sensiDir.getAbsoluteFile() + "/" + filename);
 					if(fp.exists()) {
 						// Delete existing file
 						fp.delete();
@@ -408,10 +416,14 @@ public class LocateService extends Service {
 					+ ", " + latitude + ")");
 			// Fill record buffer
 			StringBuffer buf = new StringBuffer(); 
-			buf.append(record.timestamp); buf.append("\t");
-			buf.append(record.provider); buf.append("\t");
-			buf.append(latitude); buf.append("\t");
-			buf.append(longitude);
+			buf.append(record.timestamp); buf.append("\t");		// record time
+			buf.append(record.provider); buf.append("\t");		// provider
+
+			buf.append(record.providerAvailable ? latitude : 0); buf.append("\t");				// latitude
+			buf.append(record.providerAvailable ? longitude : 0); buf.append("\t");			// longitude
+
+			buf.append(new Timestamp(location.getTime()).toString()); buf.append("\t");		// location fix time
+			buf.append(record.curBatteryLevel);		// battery level
 			buf.append("\n");
 		
 			if(fp == null) {

@@ -3,6 +3,7 @@ package edu.temple.cis8590.sensiloc;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
@@ -10,6 +11,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.CheckBoxPreference;
+import android.preference.EditTextPreference;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.Preference.OnPreferenceChangeListener;
@@ -17,6 +19,7 @@ import android.preference.PreferenceActivity;
 import android.preference.PreferenceCategory;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceManager;
+import android.preference.PreferenceScreen;
 import android.preference.RingtonePreference;
 import android.text.TextUtils;
 import android.view.MenuItem;
@@ -106,7 +109,7 @@ public class SettingsActivity extends PreferenceActivity implements OnPreference
 		getPreferenceScreen().addPreference(fakeHeader);
 		
 		addPreferencesFromResource(R.xml.pref_general);
-		
+
 		// Add 'exper_param' preference, and corresponding header.
 		fakeHeader = new PreferenceCategory(this);
 		fakeHeader.setTitle(R.string.pref_header_exper_param);
@@ -146,6 +149,7 @@ public class SettingsActivity extends PreferenceActivity implements OnPreference
 		bindPreferenceSummaryToValue(findPreference("pref_turn_delay"));
 		bindPreferenceSummaryToValue(findPreference("pref_turn_angle_list"));
 		
+		bindPreferenceSummaryToValue(findPreference("pref_filename"));
 		//bindPreferenceSummaryToValue();
 /*		bindPreferenceSummaryToValue(findPreference("example_list"));
 		bindPreferenceSummaryToValue(findPreference("notifications_new_message_ringtone"));
@@ -269,7 +273,15 @@ public class SettingsActivity extends PreferenceActivity implements OnPreference
 			preference
 					.setSummary(index >= 0 ? listPreference.getEntries()[index]
 							: null);
-
+			// Set the record filename preference to reflect the new value
+			if(preference.getKey().equals("pref_list_methods")) {
+				String filename = stringValue + "_Record.txt";
+				EditTextPreference pref = (EditTextPreference) findPreference("pref_filename");
+				pref.setSummary(filename);
+				pref.setText(filename);
+				//pref.getEditor().putString("pref_filename", filename).commit();
+				
+			}
 		} else if (preference instanceof RingtonePreference) {
 			// For ringtone preferences, look up the correct display value
 			// using RingtoneManager.
@@ -297,6 +309,9 @@ public class SettingsActivity extends PreferenceActivity implements OnPreference
 			// For all other preferences, set the summary to the value's
 			// simple string representation.
 			preference.setSummary(stringValue);
+			
+			
+
 		}
 		return true;
 	}
@@ -349,8 +364,33 @@ public class SettingsActivity extends PreferenceActivity implements OnPreference
 					preference.getContext()).getString("pref_record_freq", "0"));
 			
 		}else if(perferenceKey.equals("pref_list_methods")) {
-			onPreferenceChange(preference, PreferenceManager.getDefaultSharedPreferences(
-					preference.getContext()).getString("pref_list_methods", "GPS"));
+			String value = PreferenceManager.getDefaultSharedPreferences(
+					preference.getContext()).getString("pref_list_methods", "GPS");
+			
+			ListPreference listPref = (ListPreference)preference;
+			int index = listPref.findIndexOfValue(value);
+
+			// Set the summary to reflect the new value.
+			preference.setSummary(index >= 0 ? listPref.getEntries()[index]
+							: null);
+			
+		}else if(perferenceKey.equals("pref_filename")) {
+			// Already bind on pref_list_methods
+			String filename = PreferenceManager.getDefaultSharedPreferences(
+					preference.getContext()).getString("pref_filename", "Default");
+			if(filename.equals("Default")) {
+				String method = PreferenceManager.getDefaultSharedPreferences(
+						preference.getContext()).getString("pref_list_methods", "GPS");
+				filename = method + "_Record.txt";
+				EditTextPreference pref = (EditTextPreference) findPreference("pref_filename");
+				pref.setSummary(filename);
+				pref.setText(filename);
+				pref.getEditor().putString("pref_filename", filename).commit();
+				
+			} else {
+				onPreferenceChange(preference, PreferenceManager.getDefaultSharedPreferences(
+						preference.getContext()).getString("pref_filename", "GPS_Record.txt"));
+			}
 		}
 	}
 	/**

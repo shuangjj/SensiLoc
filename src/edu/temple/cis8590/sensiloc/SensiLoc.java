@@ -42,23 +42,29 @@ import android.os.Handler;
 import edu.temple.cis8590.sensiloc.services.*;
 public class SensiLoc extends Activity implements OnSharedPreferenceChangeListener {
     public static final String LOG_TAG = "SensiLoc";
+    // Extras keys
     public static final String KEY_METHOD = "sensiloc.methods";
     public static final String KEY_UTFREQ = "sensiloc.utfreq";
     public static final String KEY_RDFREQ = "sensiloc.rdfreq";
+    public static final String KEY_RECORD_FILE = "sensiloc.record_file";
+    
     public static final String KEY_TURN_DELAY = "sensiloc.turn_delay";
-   
     public static final String KEY_TURN_ANGLE = "sensiloc.turn_angle";
     
     public static final String KEY_MAIN_HANDLE = "sensiloc.main_handle";
+    // Activity request code
+    public static final int REQ_CODE_LOCATION_SOURCE = 100;
+    public static final int REQ_CODE_OPTIONS_MENU = 101;
     // Layout views 
-    EditText et_time;
+/*    EditText et_time;
     EditText et_utfreq;
     EditText et_rdfreq;
     EditText et_turn_delay;
-    TextView tv_result;
     Spinner method_spinner;
-    Spinner spinner_turning_angle;
+    Spinner spinner_turning_angle;*/
+    TextView tv_exper_info;
     Button but_turn;
+    TextView tv_result;
     
     String method;
     long exper_time = 0;
@@ -90,9 +96,9 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
 	    r = RingtoneManager.getRingtone(getApplicationContext(), notification);
 	   	
 	    
-	    
 	    Intent prefIntent = new Intent(this, SettingsActivity.class);
-		startActivity(prefIntent);
+		startActivityForResult(prefIntent, REQ_CODE_OPTIONS_MENU);
+		
 	    // Setup onPreferenceChanged listener for SettingsActivity
 	    sensiPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
 	    sensiPref.registerOnSharedPreferenceChangeListener(this);
@@ -119,6 +125,8 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
         				this.getResources().getStringArray(R.array.turning_angles));
         angles.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner_turning_angle.setAdapter(angles);*/
+	    
+	    tv_exper_info = (TextView)findViewById(R.id.textView_exper_info);
         // Start button
         Button but_start = (Button)findViewById(R.id.button_start);
         but_start.setOnClickListener(new OnClickListener() {
@@ -163,43 +171,51 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
 						return;
 					}
 				}*/
+				
 				// General Preferences
-				Boolean manul_enabled = sensiPref.getBoolean("pref_manual_turn", false);
+				Boolean manul_enabled = sensiPref.getBoolean("pref_manual_turn", true);
+				String record_filename = sensiPref.getString("pref_filename", "Default");
+				
 				// Experiment Preferences
 				exper_time = Integer.parseInt(sensiPref.getString("pref_exper_time", "0"));
 				int utfreq = Integer.parseInt( sensiPref.getString("pref_update_freq", "0") );
 				int rdfreq = Integer.parseInt( sensiPref.getString("pref_record_freq", "0") );
 				method = sensiPref.getString("pref_list_methods", "GPS");
+				
 				// Adaptive Preferences
 				int turn_delay = Integer.parseInt( sensiPref.getString("pref_turn_delay", "0") );
 				int turn_angle = Integer.parseInt( sensiPref.getString("pref_turn_angle_list", "0") );
 				
 				Boolean music_enabled = sensiPref.getBoolean("music_checkbox", true);
+				
 				Log.d(LOG_TAG, String.format("exper_time: %d\nupdate frequencty: %d\n" +
 						"record frequency: %d\nmethod: %s\nturn delay: %d\nturn angle: %d\n" +
-						"manual_checkbox: %s\nmusic_checkbox: %s",  
+						"manual_checkbox: %s\nmusic_checkbox: %s\nrecord_filename: %s",  
 						exper_time, utfreq, rdfreq, method, turn_delay, turn_angle, manul_enabled.toString(),
-						music_enabled.toString()));
+						music_enabled.toString(), record_filename));
 				
 				
-				/* Add extras and start location record service */
+				/* Bundle for location service */
 				locateServiceIntent = new Intent(v.getContext(), LocateService.class);
-				Bundle locateBundle = new Bundle();
 				
+				Bundle locateBundle = new Bundle();		
 				locateBundle.putInt(KEY_UTFREQ, utfreq);
 				locateBundle.putInt(KEY_RDFREQ, rdfreq);
 				if(method.equals("Adaptive")) {
 					locateBundle.putInt(KEY_TURN_DELAY, turn_delay);
 				}
 				locateBundle.putString(KEY_METHOD, method);
+				locateBundle.putString(KEY_RECORD_FILE, record_filename);
 				locateServiceIntent.putExtras(locateBundle);
 				
-				/* sensiService */
+				/* Bundle for sensiService */
 				sensiServiceIntent = new Intent(v.getContext(), SensiService.class);
+				
 				Bundle sensiBundle = new Bundle();
 				if(method.equals("Adaptive")) {
 					sensiBundle.putInt(KEY_TURN_ANGLE, turn_angle);
 				}
+				
 				sensiServiceIntent.putExtras(sensiBundle);
 				
 				/* Check Network and GPS allowance */
@@ -227,7 +243,7 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
 								 //intent.addCategory(Intent.CATEGORY_LAUNCHER);
 								 //intent.setComponent(toLaunch);
 								 //intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-								 startActivityForResult(intent, 100);
+								 startActivityForResult(intent, REQ_CODE_LOCATION_SOURCE);
 								 dialog.cancel();
 								
 							}
@@ -246,61 +262,7 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
 					
 				}else { // !(enNetworkRequired || enGPSRequired)
 					
-					// Get start battery level
-					IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-					Intent battery = getApplicationContext().registerReceiver(null, ifilter);
-					startLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-					int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-					
-					Log.d(LOG_TAG, String.format("Battery level at start %d: %d", startLevel, scale));
-					// Start services
-					startService(locateServiceIntent);
-					locateServiceStarted = true;
-			        
-			        if((method != null) && method.equals("Adaptive")) {
-			        	startService(sensiServiceIntent);
-			        	sensiServiceStarted = true;
-			        	// Trigger onSharedPreferenceChanged listener immediately with the preference's default value
-			        	onSharedPreferenceChanged(sensiPref, "pref_manual_turn");
-			        }
-			        
-			        // Start timer
-			        main_timer = new Timer();
-			        main_timer.schedule(new TimerTask() {
-
-						@Override
-						public void run() {
-							Looper.prepare();
-							// Get end battery level
-							IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-							Intent battery = getApplicationContext().registerReceiver(null, ifilter);
-							endLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-							int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-							
-							Log.d(LOG_TAG, String.format("Battery level at end %d: %d ", endLevel, scale));
-							//  Stop all running services
-							if(locateServiceStarted) {
-					    		stopService(locateServiceIntent);	
-					    		locateServiceStarted = false;
-					    	}
-						  	if(sensiServiceStarted) {
-						  		stopService(sensiServiceIntent);
-						  		sensiServiceStarted = false;
-						  	}
-						  	if(mainHandler != null) {
-						  		mainHandler.sendEmptyMessage(0);
-						  	}
-						  	//tv_result.setText("Test is over, used battery level " + (endLevel-startLevel));
-							Toast.makeText(getApplicationContext(), "Time out, used battery level "
-									+ (startLevel-endLevel), Toast.LENGTH_LONG).show();
-
-							Looper.loop();
-							
-						}
-			        	
-			        }, exper_time*60*1000);
-			        
-			        tv_result.setText("Running...");
+					startExperiment();
 				}				
 				
 			}
@@ -387,7 +349,8 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
     	
 		if(key.equals("pref_manual_turn")) {
 			if(!sensiServiceStarted) return;
-			Boolean manualEnabled = sharedPreferences.getBoolean("pref_manual_turn", false);
+			
+			Boolean manualEnabled = sharedPreferences.getBoolean("pref_manual_turn", true);
 			if(manualEnabled) {
 				but_turn.setVisibility(Button.VISIBLE);
 			} else {
@@ -396,6 +359,68 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
 		}
 		
 	}
+    private void startExperiment()
+    {
+    	// Get start battery level
+		IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+		Intent battery = getApplicationContext().registerReceiver(null, ifilter);
+		startLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+		int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+		Log.d(LOG_TAG, String.format("Battery level at start %d: %d", startLevel, scale));
+		
+		// Start locating service
+		startService(locateServiceIntent);
+		locateServiceStarted = true;
+		
+		// Start sensing service
+		if((method != null) && method.equals("Adaptive")) {
+			
+			startService(sensiServiceIntent);
+			sensiServiceStarted = true;
+			// Trigger onSharedPreferenceChanged listener immediately with the preference's default value
+        	onSharedPreferenceChanged(sensiPref, "pref_manual_turn");
+			
+		}
+		
+		// Start timer
+        main_timer = new Timer();
+        main_timer.schedule(new TimerTask() {
+			@Override
+			public void run() {
+				Looper.prepare();
+				// Get end battery level
+				IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+				Intent battery = getApplicationContext().registerReceiver(null, ifilter);
+				endLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+				int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+				
+				Log.d(LOG_TAG, String.format("Battery level at end %d: %d ", endLevel, scale));
+				
+				//  Stop all running services
+				if(locateServiceStarted) {
+		    		stopService(locateServiceIntent);	
+		    		locateServiceStarted = false;
+		    	}
+			  	if(sensiServiceStarted) {
+			  		stopService(sensiServiceIntent);
+			  		sensiServiceStarted = false;
+			  	}
+			  	// Update message by handler
+			  	if(mainHandler != null) {
+			  		mainHandler.sendEmptyMessage(0);
+			  	}
+			  	// 
+				Toast.makeText(getApplicationContext(), "Test over, used battery level "
+						+ (startLevel-endLevel), Toast.LENGTH_LONG).show();
+				
+				Looper.loop();
+				
+			}
+        	
+        }, exper_time*60*1000);
+        
+        tv_result.setText("Running...");
+    }
     @Override
     public void onResume() 
     {
@@ -407,7 +432,8 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
     }
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
-    	if(requestCode==100) {
+    	// Location source setup results
+    	if(requestCode==REQ_CODE_LOCATION_SOURCE) {
     		if(resultCode==0) {
     			// Check setting results
     			LocationManager lm = (LocationManager) this.getSystemService(Service.LOCATION_SERVICE);
@@ -421,71 +447,45 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
     				Toast.makeText(this, "Netwrok required!!", Toast.LENGTH_LONG).show();
     				return;
     			}
-    			
+    			startExperiment();
     			Toast.makeText(this, "Start services", Toast.LENGTH_SHORT).show();
     			
-    			// Get start battery level
-				IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-				Intent battery = getApplicationContext().registerReceiver(null, ifilter);
-				startLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-				int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-				
-				Log.d(LOG_TAG, String.format("Battery level at start %d: %d", startLevel, scale));
-				
-				// Start services 
-				startService(locateServiceIntent);
-				locateServiceStarted = true;
-				if((method != null) && method.equals("Adaptive")) {
-					
-					startService(sensiServiceIntent);
-					sensiServiceStarted = true;
-					// Trigger onSharedPreferenceChanged listener immediately with the preference's default value
-		        	onSharedPreferenceChanged(sensiPref, "manual_checkbox");
-					
-				}
-				
-				// Start timer
-		        main_timer = new Timer();
-		        main_timer.schedule(new TimerTask() {
-					@Override
-					public void run() {
-						Looper.prepare();
-						// Get end battery level
-						IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-						Intent battery = getApplicationContext().registerReceiver(null, ifilter);
-						endLevel = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-						int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-						
-						Log.d(LOG_TAG, String.format("Battery level at end %d: %d ", endLevel, scale));
-						//  Stop all running services
-						if(locateServiceStarted) {
-				    		stopService(locateServiceIntent);	
-				    		locateServiceStarted = false;
-				    	}
-					  	if(sensiServiceStarted) {
-					  		stopService(sensiServiceIntent);
-					  		sensiServiceStarted = false;
-					  	}
-					  	if(mainHandler != null) {
-					  		mainHandler.sendEmptyMessage(0);
-					  	}
-					  	//tv_result.setText("Test is over, used battery level " + (endLevel-startLevel));
-						Toast.makeText(getApplicationContext(), "Test over, used battery level "
-								+ (startLevel-endLevel), Toast.LENGTH_LONG).show();
-						
-						Looper.loop();
-						
-					}
-		        	
-		        }, exper_time*60*1000);
-		        
-		        tv_result.setText("Running...");
+    			
     		} else {
     			Toast.makeText(this, "start GPS failed, returned " + resultCode, Toast.LENGTH_SHORT).show();
     		}
     	}
+    	// Experiment setup options results
+    	else if(requestCode == REQ_CODE_OPTIONS_MENU) {
+        	if(resultCode == 0) {
+        		// General Preferences
+				Boolean manul_enabled = sensiPref.getBoolean("pref_manual_turn", true);
+				String record_filename = sensiPref.getString("pref_filename", "Default");
+				
+				// Experiment Preferences
+				exper_time = Integer.parseInt(sensiPref.getString("pref_exper_time", "0"));
+				int utfreq = Integer.parseInt( sensiPref.getString("pref_update_freq", "0") );
+				int rdfreq = Integer.parseInt( sensiPref.getString("pref_record_freq", "0") );
+				method = sensiPref.getString("pref_list_methods", "GPS");
+				
+				// Adaptive Preferences
+				int turn_delay = Integer.parseInt( sensiPref.getString("pref_turn_delay", "0") );
+				int turn_angle = Integer.parseInt( sensiPref.getString("pref_turn_angle_list", "0") );
+				
+				Boolean music_enabled = sensiPref.getBoolean("music_checkbox", true);
+				
+				// Update display info
+				tv_exper_info.setText("---- Experiment Parameters -----\n");
+				tv_exper_info.append( String.format("\t%-37s\t%-10s\n", "[Time]", (exper_time+" min").trim()) );
+				tv_exper_info.append( String.format("\t%-35s\t%-10s\n", "[Method]", method) );
+				tv_exper_info.append( String.format("\t%-33s\t%-10s\n", "[Frequency]", (utfreq+" sec").trim()) );
+				tv_exper_info.append( String.format("\t%-35s\t%-10s\n", "[Manual]", manul_enabled.toString()) );
+        	}
+        }
+    	
     	super.onActivityResult(requestCode, resultCode, data);
-    }
+    } 
+    
     @Override
     public void onStop() {
     	
@@ -521,7 +521,7 @@ public class SensiLoc extends Activity implements OnSharedPreferenceChangeListen
     	switch(item.getItemId()) {
     	case R.id.menu_settings:
     		Intent prefIntent = new Intent(this, SettingsActivity.class);
-    		startActivity(prefIntent);
+    		startActivityForResult(prefIntent, REQ_CODE_OPTIONS_MENU);
     		break;
     	default:
     		return false;
